@@ -131,6 +131,12 @@ pub fn onInput(self: *Sheet, input: Key) !void {
     const row: usize = @intCast(self.current[0]);
     const col: usize = @intCast(self.current[1]);
     var cell = &self.cells[row * self.cols.len + col];
-    try cell.data.append(input.bytes);
-    self.cols[col] = @max(self.cols[col], cell.data.display_width());
+    if (input.codepoint == .backspace) {
+        if (cell.data.codepoints.items.len > 0) {
+            cell.data.remove(cell.data.codepoints.items.len - 1);
+        }
+    } else {
+        try cell.data.append(input.bytes);
+        self.cols[col] = @max(self.cols[col], cell.data.display_width());
+    }
 }

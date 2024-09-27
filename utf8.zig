@@ -45,11 +45,37 @@ pub const Str = struct {
 
     pub fn append(self: *Str, data: []const u8) !void {
         try self.bytes.appendSlice(data);
+
         var s = data;
         while (s.len > 0) {
             const cp = CodepointInfo.parseSingle(s);
             try self.codepoints.append(cp);
             s = s[@max(1, cp.len)..];
+        }
+    }
+
+    fn byteIndexOf(self: *const Str, i: usize) usize {
+        var result: usize = 0;
+        for (0..i) |j| {
+            result += self.codepoints.items[j].len;
+        }
+        return result;
+    }
+
+    pub fn remove(self: *Str, i: usize) void {
+        const idx = self.byteIndexOf(i);
+        const cplen = self.codepoints.orderedRemove(i).len;
+        std.mem.copyForwards(u8, self.bytes.items[idx..], self.bytes.items[idx + cplen ..]);
+        self.bytes.shrinkAndFree(self.bytes.items.len - cplen);
+    }
+
+    pub fn removeRange(self: *Str, from: usize, to: usize) void {
+        const start = self.byteIndexOf(from);
+        const end = self.byteIndexOf(to) + self.codepoints.items[to].len;
+        std.mem.copyForwards(u8, self.bytes.items[start..], self.bytes.items[end..]);
+        self.bytes.shrinkAndFree(self.bytes.items.len + start - end);
+        for (from..to + 1) |_| {
+            _ = self.codepoints.orderedRemove(from);
         }
     }
 
