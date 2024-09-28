@@ -4,6 +4,7 @@ const Renderer = @import("render/Renderer.zig");
 const Sheet = @import("sheets/Sheet.zig");
 const Position = @import("common.zig").ipos;
 const common = @import("common.zig");
+const PixelBuffer = @import("render/PixelBuffer.zig");
 
 const posix = std.posix;
 
@@ -14,6 +15,7 @@ raw_termios: posix.termios = undefined,
 orig_termios: posix.termios = undefined,
 uncooked: bool = false,
 size: Size = undefined,
+pixel_buf: PixelBuffer = undefined,
 renderer: Renderer = undefined,
 
 const Size = struct { rows: usize, cols: usize };
@@ -25,6 +27,9 @@ pub fn init() !Term {
 }
 
 pub fn deinit(self: *Term) void {
+    self.renderer.deinit();
+    self.pixel_buf.deinit();
+
     self.cook() catch {};
     self.tty.close();
 }
@@ -83,21 +88,17 @@ pub fn restore_screen(self: *const Term) !void {
 pub fn main() !void {
     var term = try Term.init();
     try term.uncook();
-    defer {
-        term.restore_screen() catch {};
-        term.deinit();
-    }
+    defer term.deinit();
+
     global_term = &term;
 
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    term.pixel_buf = try PixelBuffer.init(allocator, try term.getSize());
     term.renderer = try Renderer.init(
         term.tty.writer(),
-        std.heap.page_allocator,
-        term.size.rows,
-        term.size.cols,
+        &term.pixel_buf,
     );
-
-    try term.clear_screen();
-    try term.updateSize();
 
     var sht = try Sheet.init(std.heap.page_allocator, 60, 100);
 
@@ -152,6 +153,13 @@ pub fn main() !void {
             }
         }
     }
+
+    switch (gpa.deinit()) {
+        .leak => {
+            std.debug.print("oops, leaky time!", .{});
+        },
+        .ok => {},
+    }
 }
 
 var global_term: *Term = undefined;
@@ -159,15 +167,15 @@ fn handleSigWinch(_: c_int) callconv(.C) void {
     global_term.updateSize() catch return;
 }
 
-pub fn updateSize(self: *Term) !void {
+fn getSize(self: *const Term) !common.upos {
     var size = std.mem.zeroes(posix.winsize);
     const err = posix.system.ioctl(self.tty.handle, posix.T.IOCGWINSZ, @intFromPtr(&size));
     if (posix.errno(err) != .SUCCESS) {
         return posix.unexpectedErrno(@enumFromInt(err));
     }
-    self.size = Size{
-        .rows = size.ws_row,
-        .cols = size.ws_col,
-    };
-    try self.renderer.resize(self.size.rows, self.size.cols);
+    return .{ size.ws_row, size.ws_col };
+}
+
+pub fn updateSize(self: *Term) !void {
+    try self.pixel_buf.resize(try self.getSize());
 }

@@ -41,26 +41,27 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
     // render column headers
     const row_header_w = std.math.log10(self.cols.len) + 2;
 
+    const buf = renderer.buf;
     for (0..row_header_w) |i| {
-        renderer.pixels[i].style = .{
+        buf.pixels[i].style = .{
             .fg = .cyan,
         };
     }
     const sheetzu_idx = row_header_w - 4;
-    @memcpy(renderer.pixels[sheetzu_idx + 1].content[0..3], "•");
-    @memcpy(renderer.pixels[sheetzu_idx + 2].content[0..3], "ᴥ");
-    @memcpy(renderer.pixels[sheetzu_idx + 3].content[0..3], "•");
-    renderer.pixels[sheetzu_idx + 1].content_len = 3;
-    renderer.pixels[sheetzu_idx + 2].content_len = 3;
-    renderer.pixels[sheetzu_idx + 3].content_len = 3;
+    @memcpy(buf.pixels[sheetzu_idx + 1].content[0..3], "•");
+    @memcpy(buf.pixels[sheetzu_idx + 2].content[0..3], "ᴥ");
+    @memcpy(buf.pixels[sheetzu_idx + 3].content[0..3], "•");
+    buf.pixels[sheetzu_idx + 1].content_len = 3;
+    buf.pixels[sheetzu_idx + 2].content_len = 3;
+    buf.pixels[sheetzu_idx + 3].content_len = 3;
     var col_offset: usize = row_header_w;
     header: for (self.cols, 0..) |w, i| {
         const header = common.b26(i);
         const padding = (w - header.len) / 2;
         for (0..w) |cell_offset| {
-            if (col_offset + cell_offset >= renderer.cols) break :header;
+            if (col_offset + cell_offset >= renderer.buf.size[1]) break :header;
 
-            const px = &renderer.pixels[col_offset + cell_offset];
+            const px = &buf.pixels[col_offset + cell_offset];
             px.style = header_style;
             if (i == self.current[1]) px.style.reverse = true;
             px.content_len = 1;
@@ -71,15 +72,15 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
         col_offset += w;
     }
 
-    var pd = try Str.initBytes(renderer.allocator, &[_]u8{32});
-    var row_offset: usize = renderer.cols;
+    var pd = try Str.initBytes(buf.allocator, &[_]u8{32});
+    var row_offset: usize = buf.size[1];
     for (self.rows, 0..) |_, r| {
-        if (r >= renderer.rows - 1) break;
+        if (r >= buf.size[0] - 1) break;
 
         const header = common.b10(r + 1);
         const padding = row_header_w - header.len - 1;
         for (0..row_header_w) |i| {
-            const px = &renderer.pixels[row_offset + i];
+            const px = &buf.pixels[row_offset + i];
             px.style = header_style;
             if (r == self.current[0]) px.style.reverse = true;
             if (i >= padding and header.len + padding > i) {
@@ -91,7 +92,7 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
             const cell = self.cells[r * self.cols.len + c];
             var pos = common.upos{ r + 1, col_offset };
             const is_current = r == self.current[0] and c == self.current[1];
-            const rect = renderer.write(
+            const rect = renderer.writeStr(
                 pos,
                 cell.str,
                 if (is_current) header_style else cell.style,
@@ -99,12 +100,12 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
             if (w < rect[1]) self.cols[c] = rect[1];
             pos[1] += rect[1];
             for (0..w - rect[1]) |_| {
-                pos += renderer.write(pos, pd, if (is_current) header_style else cell.style);
+                pos += renderer.writeStr(pos, pd, if (is_current) header_style else cell.style);
             }
             col_offset += w;
-            if (renderer.cols <= col_offset) break :col;
+            if (buf.size[1] <= col_offset) break :col;
         }
-        row_offset += renderer.cols;
+        row_offset += buf.size[1];
     }
     pd.deinit();
 }
