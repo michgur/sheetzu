@@ -110,14 +110,15 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
     pd.deinit();
 }
 
-fn unicodeLen(bytes: []const u8) usize {
-    var i: usize = 0;
-    for (0..bytes.len) |len| {
-        i += std.unicode.utf8ByteSequenceLength(bytes[i]) catch 1;
-        if (i >= bytes.len) return len + 1;
-    }
-    return bytes.len;
+pub fn getCell(self: *const Sheet, position: common.upos) ?*Cell {
+    if (position[0] >= self.rows.len or position[1] >= self.cols.len) return null;
+    return &self.cells[position[0] * self.cols.len + position[1]];
 }
+
+pub inline fn getCurrentCell(self: *const Sheet) *Cell {
+    return self.getCell(common.posCast(self.current)) orelse unreachable;
+}
+
 pub fn setCell(self: *Sheet, position: common.upos, content: []const u8) !void {
     const row: usize = @intCast(position[0]);
     const col: usize = @intCast(position[1]);
@@ -125,6 +126,10 @@ pub fn setCell(self: *Sheet, position: common.upos, content: []const u8) !void {
     try cell.str.replaceAll(content);
     self.cols[col] = @max(self.cols[col], cell.str.display_width());
     cell.tick();
+}
+
+pub inline fn setCurrentCell(self: *Sheet, content: []const u8) !void {
+    try self.setCell(common.posCast(self.current), content);
 }
 
 pub fn onInput(self: *Sheet, input: Key) !void {

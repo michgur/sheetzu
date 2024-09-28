@@ -136,3 +136,10 @@ pub fn display_width(self: *const DisplayString) usize {
     }
     return result;
 }
+
+pub fn clone(self: *const DisplayString) !DisplayString {
+    return DisplayString{ // shallow copy is good enough here
+        .bytes = try self.bytes.clone(),
+        .graphemes = try self.graphemes.clone(),
+    };
+}

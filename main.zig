@@ -2,9 +2,9 @@ const std = @import("std");
 const Input = @import("input/Input.zig");
 const Renderer = @import("render/Renderer.zig");
 const Sheet = @import("sheets/Sheet.zig");
-const Position = @import("common.zig").ipos;
 const common = @import("common.zig");
 const PixelBuffer = @import("render/PixelBuffer.zig");
+const DisplayString = @import("DisplayString.zig");
 
 const posix = std.posix;
 
@@ -14,11 +14,9 @@ tty: std.fs.File,
 raw_termios: posix.termios = undefined,
 orig_termios: posix.termios = undefined,
 uncooked: bool = false,
-size: Size = undefined,
 pixel_buf: PixelBuffer = undefined,
 renderer: Renderer = undefined,
-
-const Size = struct { rows: usize, cols: usize };
+clipboard: DisplayString = undefined,
 
 pub fn init() !Term {
     return Term{
@@ -90,8 +88,6 @@ pub fn main() !void {
     try term.uncook();
     defer term.deinit();
 
-    global_term = &term;
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     term.pixel_buf = try PixelBuffer.init(allocator, try term.getSize());
@@ -99,6 +95,7 @@ pub fn main() !void {
         term.tty.writer(),
         &term.pixel_buf,
     );
+    term.clipboard = DisplayString.init(allocator);
 
     var sht = try Sheet.init(std.heap.page_allocator, 60, 100);
 
@@ -122,6 +119,11 @@ pub fn main() !void {
         }
         then = now;
 
+        if (winch) {
+            try term.pixel_buf.resize(try term.getSize());
+            winch = false;
+        }
+
         try sht.render(&term.renderer);
         try term.renderer.flush();
 
@@ -144,12 +146,19 @@ pub fn main() !void {
                     .i => {
                         insert_mode = true;
                     },
-                    .x => try sht.setCell(common.posCast(sht.current), &.{}),
+                    .x => t: {
+                        const str = try sht.getCurrentCell().str.clone();
+                        sht.setCurrentCell(&.{}) catch break :t;
+                        term.clipboard.deinit();
+                        term.clipboard = str;
+                    },
                     .q => break :outer,
+                    .y => try term.clipboard.replaceAll(sht.getCurrentCell().str.bytes.items),
+                    .p => try sht.setCurrentCell(term.clipboard.bytes.items),
                     else => {},
                 }
-                sht.current = @max(sht.current, Position{ 0, 0 });
-                sht.current = @min(sht.current, Position{ @intCast(sht.rows.len - 1), @intCast(sht.cols.len - 1) });
+                sht.current = @max(sht.current, common.ipos{ 0, 0 });
+                sht.current = @min(sht.current, common.ipos{ @intCast(sht.rows.len - 1), @intCast(sht.cols.len - 1) });
             }
         }
     }
@@ -162,9 +171,10 @@ pub fn main() !void {
     }
 }
 
-var global_term: *Term = undefined;
+var winch: bool = false;
+
 fn handleSigWinch(_: c_int) callconv(.C) void {
-    global_term.updateSize() catch return;
+    winch = true;
 }
 
 fn getSize(self: *const Term) !common.upos {
@@ -174,8 +184,4 @@ fn getSize(self: *const Term) !common.upos {
         return posix.unexpectedErrno(@enumFromInt(err));
     }
     return .{ size.ws_row, size.ws_col };
-}
-
-pub fn updateSize(self: *Term) !void {
-    try self.pixel_buf.resize(try self.getSize());
 }
