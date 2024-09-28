@@ -1,5 +1,4 @@
 const std = @import("std");
-const Cursor = @import("Cursor.zig");
 const Input = @import("input/Input.zig");
 const Renderer = @import("render/Renderer.zig");
 const Sheet = @import("sheets/Sheet.zig");
@@ -90,18 +89,15 @@ pub fn main() !void {
     }
     global_term = &term;
 
-    var cursor = Cursor.init(term.tty.writer());
     term.renderer = try Renderer.init(
         term.tty.writer(),
         std.heap.page_allocator,
         term.size.rows,
         term.size.cols,
-        &cursor,
     );
 
     try term.clear_screen();
     try term.updateSize();
-    try cursor.move(.{ 0, 0 }, .abs);
 
     var sht = try Sheet.init(std.heap.page_allocator, 60, 100);
 

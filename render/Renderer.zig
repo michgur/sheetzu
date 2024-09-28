@@ -1,5 +1,4 @@
 const std = @import("std");
-const Cursor = @import("../Cursor.zig");
 const Pixel = @import("Pixel.zig");
 const Style = @import("Style.zig");
 const common = @import("../common.zig");
@@ -9,7 +8,6 @@ const Renderer = @This();
 
 writer: std.fs.File.Writer,
 allocator: std.mem.Allocator,
-cursor: *Cursor,
 rows: usize,
 cols: usize,
 pixels: []Pixel,
@@ -19,14 +17,12 @@ pub fn init(
     allocator: std.mem.Allocator,
     rows: usize,
     cols: usize,
-    cursor: *Cursor,
 ) !Renderer {
     const res = Renderer{
         .writer = writer,
         .rows = rows,
         .cols = cols,
         .allocator = allocator,
-        .cursor = cursor,
         .pixels = try allocator.alloc(Pixel, rows * cols),
     };
 
@@ -35,7 +31,7 @@ pub fn init(
             res.pixels[r * cols + c] = Pixel.BLANK;
         }
     }
-    try res.cursor.hide();
+    try res.writer.writeAll("\x1B[?25l"); // hide cursor
 
     return res;
 }
@@ -100,9 +96,7 @@ pub fn flush(self: *const Renderer) !void {
     defer buf.flush() catch {};
     var writer = buf.writer();
 
-    const pos = self.cursor.pos;
     try placeCursor(.{ 0, 0 }, writer);
-    defer placeCursor(pos, writer) catch {};
 
     var i: usize = 0;
     while (i < self.pixels.len) {
