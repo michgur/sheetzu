@@ -53,7 +53,7 @@ pub fn dump(self: *const PixelBuffer, writer: anytype) !void {
             defer px.* = Pixel.BLANK;
 
             try px.dump(writer);
-            c += @max(1, px.width);
+            c += @max(1, px.grapheme.display_width);
         }
     }
 }

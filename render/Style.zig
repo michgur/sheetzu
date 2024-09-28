@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const Style = @This();
+
 pub const Color = enum {
     none,
     black,

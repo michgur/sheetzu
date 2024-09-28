@@ -41,15 +41,13 @@ pub fn writeStr(
 ) common.upos {
     var wpos: common.upos = position;
     var iter = str.iterator();
-    while (iter.next()) |cp| {
-        if (cp.info.display_width <= 0) continue;
+    while (iter.next()) |grapheme| {
+        if (grapheme.info.display_width <= 0) continue; // future: zero joiners and other shizz
 
         var px = self.buf.getPixel(wpos) orelse break;
+        px.set(grapheme);
         px.style = style;
-        px.content_len = cp.info.len;
-        px.width = cp.info.display_width;
-        @memcpy(px.content[0..px.content_len], cp.bytes);
-        wpos[1] += px.width;
+        wpos[1] += grapheme.info.display_width;
     }
     return wpos - position;
 }

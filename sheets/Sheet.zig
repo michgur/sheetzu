@@ -38,22 +38,23 @@ const header_style = Style{
     .bold = true,
 };
 pub fn render(self: *const Sheet, renderer: *Renderer) !void {
-    // render column headers
-    const row_header_w = std.math.log10(self.cols.len) + 2;
-
     const buf = renderer.buf;
+
+    // render sheetzu
+    const row_header_w = std.math.log10(self.cols.len) + 2;
     for (0..row_header_w) |i| {
         buf.pixels[i].style = .{
             .fg = .cyan,
         };
     }
     const sheetzu_idx = row_header_w - 4;
-    @memcpy(buf.pixels[sheetzu_idx + 1].content[0..3], "•");
-    @memcpy(buf.pixels[sheetzu_idx + 2].content[0..3], "ᴥ");
-    @memcpy(buf.pixels[sheetzu_idx + 3].content[0..3], "•");
-    buf.pixels[sheetzu_idx + 1].content_len = 3;
-    buf.pixels[sheetzu_idx + 2].content_len = 3;
-    buf.pixels[sheetzu_idx + 3].content_len = 3;
+    const eye = DisplayString.Grapheme.parseSingle("•");
+    const mth = DisplayString.Grapheme.parseSingle("ᴥ");
+    buf.pixels[sheetzu_idx + 1].set(eye);
+    buf.pixels[sheetzu_idx + 2].set(mth);
+    buf.pixels[sheetzu_idx + 3].set(eye);
+
+    // render column headers
     var col_offset: usize = row_header_w;
     header: for (self.cols, 0..) |w, i| {
         const header = common.b26(i);
@@ -64,9 +65,8 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
             const px = &buf.pixels[col_offset + cell_offset];
             px.style = header_style;
             if (i == self.current[1]) px.style.reverse = true;
-            px.content_len = 1;
             if (header.len + padding > cell_offset and cell_offset >= padding) {
-                px.content[0] = header[cell_offset - padding];
+                px.setAscii(header[cell_offset - padding]);
             }
         }
         col_offset += w;
@@ -84,7 +84,7 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
             px.style = header_style;
             if (r == self.current[0]) px.style.reverse = true;
             if (i >= padding and header.len + padding > i) {
-                px.content[0] = header[i - padding];
+                px.setAscii(header[i - padding]);
             }
         }
         col_offset = row_header_w;

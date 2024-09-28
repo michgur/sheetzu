@@ -21,6 +21,11 @@ pub const GraphemeInfo = struct {
 pub const Grapheme = struct {
     info: GraphemeInfo,
     bytes: []const u8,
+
+    pub fn parseSingle(bytes: []const u8) Grapheme {
+        const info = GraphemeInfo.parseSingle(bytes);
+        return .{ .bytes = bytes[0..info.len], .info = info };
+    }
 };
 
 bytes: std.ArrayList(u8),
