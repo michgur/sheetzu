@@ -93,7 +93,7 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
             const is_current = r == self.current[0] and c == self.current[1];
             const rect = renderer.write(
                 pos,
-                cell.data,
+                cell.str,
                 if (is_current) header_style else cell.style,
             );
             if (w < rect[1]) self.cols[c] = rect[1];
@@ -121,10 +121,9 @@ pub fn setCell(self: *Sheet, position: common.upos, content: []const u8) !void {
     const row: usize = @intCast(position[0]);
     const col: usize = @intCast(position[1]);
     var cell = &self.cells[row * self.cols.len + col];
-    const alloc = cell.data.bytes.allocator;
-    cell.data.deinit();
-    cell.data = try Str.initBytes(alloc, content);
-    self.cols[col] = @max(self.cols[col], cell.data.display_width());
+    try cell.str.replaceAll(content);
+    self.cols[col] = @max(self.cols[col], cell.str.display_width());
+    cell.tick();
 }
 
 pub fn onInput(self: *Sheet, input: Key) !void {
@@ -132,11 +131,18 @@ pub fn onInput(self: *Sheet, input: Key) !void {
     const col: usize = @intCast(self.current[1]);
     var cell = &self.cells[row * self.cols.len + col];
     if (input.codepoint == .backspace) {
-        if (cell.data.codepoints.items.len > 0) {
-            cell.data.remove(cell.data.codepoints.items.len - 1);
+        if (cell.str.codepoints.items.len > 0) {
+            cell.str.remove(cell.str.codepoints.items.len - 1);
         }
     } else {
-        try cell.data.append(input.bytes);
-        self.cols[col] = @max(self.cols[col], cell.data.display_width());
+        try cell.str.append(input.bytes);
+        self.cols[col] = @max(self.cols[col], cell.str.display_width());
     }
+}
+
+pub fn tick(self: *Sheet) void {
+    const row: usize = @intCast(self.current[0]);
+    const col: usize = @intCast(self.current[1]);
+    var cell = &self.cells[row * self.cols.len + col];
+    cell.tick();
 }

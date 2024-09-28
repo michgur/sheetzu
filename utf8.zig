@@ -85,6 +85,18 @@ pub const Str = struct {
         self.* = undefined;
     }
 
+    pub fn replaceAll(self: *Str, new_content: []const u8) !void {
+        self.bytes.clearRetainingCapacity();
+        self.codepoints.clearRetainingCapacity();
+        try self.append(new_content);
+        if (self.bytes.capacity > self.bytes.items.len) {
+            self.bytes.shrinkAndFree(self.bytes.items.len);
+        }
+        if (self.codepoints.capacity > self.codepoints.items.len) {
+            self.codepoints.shrinkAndFree(self.codepoints.items.len);
+        }
+    }
+
     const Iterator = struct {
         str: *const Str,
         i: usize = 0,

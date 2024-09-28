@@ -131,7 +131,10 @@ pub fn main() !void {
         while (input.next() catch continue :outer) |key| {
             if (insert_mode) {
                 if (key.codepoint == .escape) {
-                    insert_mode = false;
+                    if (insert_mode) {
+                        sht.tick();
+                        insert_mode = false;
+                    }
                 } else {
                     try sht.onInput(key);
                 }
