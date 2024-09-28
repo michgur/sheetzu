@@ -1,18 +1,18 @@
 const std = @import("std");
 const Position = @import("../common.zig").ipos;
 const Style = @import("../render/Style.zig");
-const Str = @import("../utf8.zig").Str;
+const DisplayString = @import("../DisplayString.zig");
 const CellData = @import("data.zig").CellData;
 
 const Cell = @This();
 
-str: Str,
+str: DisplayString,
 style: Style,
 data: CellData,
 
 pub fn init(allocator: std.mem.Allocator) Cell {
     return Cell{
-        .str = Str.init(allocator),
+        .str = DisplayString.init(allocator),
         .style = Style{},
         .data = .{ .Blank = {} },
     };

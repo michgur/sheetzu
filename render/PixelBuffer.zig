@@ -2,7 +2,6 @@ const std = @import("std");
 const Pixel = @import("Pixel.zig");
 const Style = @import("Style.zig");
 const common = @import("../common.zig");
-const Str = @import("../utf8.zig").Str;
 
 const PixelBuffer = @This();
 

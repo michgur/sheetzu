@@ -4,7 +4,7 @@ const Renderer = @import("../render/Renderer.zig");
 const Style = @import("../render/Style.zig");
 const common = @import("../common.zig");
 const Key = @import("../input/Key.zig");
-const Str = @import("../utf8.zig").Str;
+const DisplayString = @import("../DisplayString.zig");
 
 const Sheet = @This();
 
@@ -72,7 +72,7 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
         col_offset += w;
     }
 
-    var pd = try Str.initBytes(buf.allocator, &[_]u8{32});
+    var pd = try DisplayString.initBytes(buf.allocator, &[_]u8{32});
     var row_offset: usize = buf.size[1];
     for (self.rows, 0..) |_, r| {
         if (r >= buf.size[0] - 1) break;
@@ -132,8 +132,8 @@ pub fn onInput(self: *Sheet, input: Key) !void {
     const col: usize = @intCast(self.current[1]);
     var cell = &self.cells[row * self.cols.len + col];
     if (input.codepoint == .backspace) {
-        if (cell.str.codepoints.items.len > 0) {
-            cell.str.remove(cell.str.codepoints.items.len - 1);
+        if (cell.str.graphemes.items.len > 0) {
+            cell.str.remove(cell.str.graphemes.items.len - 1);
         }
     } else {
         try cell.str.append(input.bytes);

@@ -2,7 +2,7 @@ const std = @import("std");
 const Pixel = @import("Pixel.zig");
 const Style = @import("Style.zig");
 const common = @import("../common.zig");
-const Str = @import("../utf8.zig").Str;
+const DisplayString = @import("../DisplayString.zig");
 const PixelBuffer = @import("PixelBuffer.zig");
 
 const Renderer = @This();
@@ -27,10 +27,16 @@ pub fn init(
     return res;
 }
 
+pub fn deinit(self: *Renderer) void {
+    self.writer.writeAll("\x1b[?1049l") catch {}; // Disable alternative buffer.
+    self.writer.writeAll("\x1b[?47l") catch {}; // Restore screen.
+    self.writer.writeAll("\x1b[u") catch {}; // Restore cursor position.
+}
+
 pub fn writeStr(
     self: *Renderer,
     position: common.upos,
-    str: Str,
+    str: DisplayString,
     style: Style,
 ) common.upos {
     var wpos: common.upos = position;
@@ -53,10 +59,4 @@ pub fn flush(self: *const Renderer) !void {
     defer buffered_writer.flush() catch {};
 
     try self.buf.dump(buffered_writer.writer());
-}
-
-pub fn deinit(self: *Renderer) void {
-    self.writer.writeAll("\x1b[?1049l") catch {}; // Disable alternative buffer.
-    self.writer.writeAll("\x1b[?47l") catch {}; // Restore screen.
-    self.writer.writeAll("\x1b[u") catch {}; // Restore cursor position.
 }

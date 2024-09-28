@@ -3,6 +3,12 @@ const std = @import("std");
 /// pair of (row, column)
 pub const ipos = @Vector(2, isize);
 pub const upos = @Vector(2, usize);
+
+pub const Rect = struct {
+    top_left: ipos,
+    size: upos,
+};
+
 pub inline fn posCast(pos: anytype) switch (@TypeOf(pos)) {
     ipos => upos,
     upos => ipos,
