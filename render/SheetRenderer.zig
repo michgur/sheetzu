@@ -27,9 +27,9 @@ inline fn penDown(self: *SheetRenderer) PenError!void {
     self.pen[0] += 1;
     self.pen[1] = 0;
 }
-inline fn penNext(self: *SheetRenderer) PenError!void {
-    if (self.pen[1] + 1 >= self.screen.size[1]) return PenError.OutOfScreen;
-    self.pen[1] += 1;
+inline fn penNext(self: *SheetRenderer, amt: usize) PenError!void {
+    if (self.pen[1] + amt >= self.screen.size[1]) return PenError.OutOfScreen;
+    self.pen[1] += amt;
 }
 inline fn penReset(self: *SheetRenderer) void {
     self.pen = .{ 0, 0 };
@@ -44,28 +44,52 @@ fn renderCell(
 ) PenError!void {
     const EMPTY: u8 = '\x20';
     const content_width = content.display_width();
-    const end_pos = self.pen + common.upos{ 0, width };
     const left_padding = switch (alignment) {
         .left => 0,
         .center => @max(0, width - content_width) / 2,
         .right => @max(0, width - content_width), // this seems wrong
     };
+    const right_padding = @max(0, width - content_width - left_padding);
 
     for (0..left_padding) |_| {
         self.put(EMPTY, style);
-        try self.penNext();
+        try self.penNext(1);
     }
 
     var iter = content.iterator();
     while (iter.next()) |grapheme| {
         self.put(grapheme, style);
-        try self.penNext();
+        try self.penNext(grapheme.info.display_width);
     }
 
-    if (self.pen[1] < end_pos[1]) {
-        for (self.pen[1]..end_pos[1]) |_| {
-            self.put(EMPTY, style);
-            try self.penNext();
+    for (0..right_padding) |_| {
+        self.put(EMPTY, style);
+        try self.penNext(1);
+    }
+}
+
+const scrolloff: usize = 1;
+var offset: common.upos = .{ 0, 0 };
+fn computeCellOffset(self: *SheetRenderer, sht: *const Sheet) void {
+    const sizes = [2][]usize{ sht.rows, sht.cols };
+    const paddings = [2]usize{ 2, 0 };
+    for (0..2) |d| {
+        const curr: usize = @intCast(sht.current[d]);
+        const start = curr + 1 -| scrolloff;
+        const end = @min(sizes[d].len, curr + scrolloff);
+        if (start < offset[d]) {
+            offset[d] = @max(0, start);
+            continue;
+        }
+
+        var acc_size: usize = 0;
+        for (offset[d]..end) |i| {
+            acc_size += sizes[d][i];
+        }
+        for (offset[d]..end) |i| {
+            if (acc_size < self.screen.size[d] - paddings[d]) break;
+            acc_size -= sizes[d][i];
+            offset[d] += 1;
         }
     }
 }
@@ -77,6 +101,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
     defer str.deinit();
 
     self.penReset();
+    self.computeCellOffset(sht);
 
     try str.append(common.bb26(@intCast(sht.current[1]), &buf));
     try str.append(":");
@@ -102,7 +127,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
     ) catch {};
 
     // render column headers
-    for (sht.cols, 0..) |w, i| {
+    for (sht.cols[offset[1]..], offset[1]..) |w, i| {
         const header = common.bb26(i, &buf);
 
         var st = sht.header_style;
@@ -110,7 +135,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
         self.renderCell(w, try str.replaceAll(header), st, .center) catch break;
     }
 
-    for (sht.rows, 0..) |_, r| {
+    for (sht.rows[offset[0]..], offset[0]..) |_, r| {
         self.penDown() catch break;
 
         // row header
@@ -121,7 +146,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
         self.renderCell(row_header_w, header, st, .right) catch continue;
 
         // row content
-        for (sht.cols, 0..) |w, c| {
+        for (sht.cols[offset[1]..], offset[1]..) |w, c| {
             var cell = sht.cells[r * sht.cols.len + c];
             const is_current = r == sht.current[0] and c == sht.current[1];
             self.renderCell(
