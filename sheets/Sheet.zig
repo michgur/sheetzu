@@ -47,12 +47,8 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
             .fg = .cyan,
         };
     }
-    const sheetzu_idx = row_header_w - 4;
-    const eye = DisplayString.Grapheme.parseSingle("•");
-    const mth = DisplayString.Grapheme.parseSingle("ᴥ");
-    buf.pixels[sheetzu_idx + 1].set(eye);
-    buf.pixels[sheetzu_idx + 2].set(mth);
-    buf.pixels[sheetzu_idx + 3].set(eye);
+    const sheetzu_idx = row_header_w - 3;
+    _ = renderer.renderUnicode(.{ 0, sheetzu_idx }, "•ᴥ•", null);
 
     // render column headers
     var col_offset: usize = row_header_w;
@@ -73,7 +69,9 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
         col_offset += w;
     }
 
-    var pd = try DisplayString.initBytes(buf.allocator, &[_]u8{32});
+    var pd: [16]u8 = undefined;
+    @memset(&pd, 32);
+
     var row_offset: usize = buf.size[1];
     for (self.rows, 0..) |_, r| {
         if (r >= buf.size[0] - 1) break;
@@ -93,7 +91,7 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
             const cell = self.cells[r * self.cols.len + c];
             var pos = common.upos{ r + 1, col_offset };
             const is_current = r == self.current[0] and c == self.current[1];
-            const rect = renderer.writeStr(
+            const rect = renderer.renderUnicode(
                 pos,
                 cell.str,
                 if (is_current) header_style else cell.style,
@@ -101,14 +99,13 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
             if (w < rect[1]) self.cols[c] = rect[1];
             pos[1] += rect[1];
             for (0..w - rect[1]) |_| {
-                pos += renderer.writeStr(pos, pd, if (is_current) header_style else cell.style);
+                pos += renderer.renderAscii(pos, pd[0..1], if (is_current) header_style else cell.style);
             }
             col_offset += w;
             if (buf.size[1] <= col_offset) break :col;
         }
         row_offset += buf.size[1];
     }
-    pd.deinit();
 }
 
 pub fn getCell(self: *const Sheet, position: common.upos) ?*Cell {

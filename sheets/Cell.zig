@@ -22,6 +22,7 @@ pub fn tick(self: *Cell) void {
     self.data = CellData.parse(&self.str);
     switch (self.data) {
         .Numeral => self.style.fg = .green,
+        .Formula => self.style.fg = .red,
         else => self.style.fg = .none,
     }
 }
