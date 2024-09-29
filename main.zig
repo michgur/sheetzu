@@ -1,9 +1,9 @@
 const std = @import("std");
 const Input = @import("input/Input.zig");
-const Renderer = @import("render/Renderer.zig");
+const SheetRenderer = @import("render/SheetRenderer.zig");
 const Sheet = @import("sheets/Sheet.zig");
 const common = @import("common.zig");
-const PixelBuffer = @import("render/PixelBuffer.zig");
+const Screen = @import("render/Screen.zig");
 const DisplayString = @import("DisplayString.zig");
 
 const posix = std.posix;
@@ -14,8 +14,7 @@ tty: std.fs.File,
 raw_termios: posix.termios = undefined,
 orig_termios: posix.termios = undefined,
 uncooked: bool = false,
-pixel_buf: PixelBuffer = undefined,
-renderer: Renderer = undefined,
+screen: Screen = undefined,
 clipboard: DisplayString = undefined,
 
 pub fn init() !Term {
@@ -25,8 +24,7 @@ pub fn init() !Term {
 }
 
 pub fn deinit(self: *Term) void {
-    self.renderer.deinit();
-    self.pixel_buf.deinit();
+    self.screen.deinit();
 
     self.cook() catch {};
     self.tty.close();
@@ -68,21 +66,6 @@ pub fn uncook(self: *Term) !void {
     try posix.tcsetattr(self.tty.handle, .FLUSH, self.raw_termios);
 }
 
-pub fn clear_screen(self: *const Term) !void {
-    const writer = self.tty.writer();
-    try writer.writeAll("\x1b[s"); // Save cursor position.
-    try writer.writeAll("\x1b[?47h"); // Save screen.
-    try writer.writeAll("\x1b[?1049h"); // Enable alternative buffer.
-    try writer.writeAll("\x1b[2J"); // Clear screen
-}
-
-pub fn restore_screen(self: *const Term) !void {
-    const writer = self.tty.writer();
-    try writer.writeAll("\x1b[?1049l"); // Disable alternative buffer.
-    try writer.writeAll("\x1b[?47l"); // Restore screen.
-    try writer.writeAll("\x1b[u"); // Restore cursor position.
-}
-
 pub fn main() !void {
     var term = try Term.init();
     try term.uncook();
@@ -90,14 +73,11 @@ pub fn main() !void {
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
-    term.pixel_buf = try PixelBuffer.init(allocator, try term.getSize());
-    term.renderer = try Renderer.init(
-        term.tty.writer(),
-        &term.pixel_buf,
-    );
+    term.screen = try Screen.init(term.tty.writer(), allocator, try term.getSize());
     term.clipboard = DisplayString.init(allocator);
 
     var sht = try Sheet.init(std.heap.page_allocator, 60, 100);
+    var renderer = SheetRenderer{ .screen = &term.screen };
 
     try posix.sigaction(posix.SIG.WINCH, &posix.Sigaction{
         .handler = .{ .handler = handleSigWinch },
@@ -120,12 +100,12 @@ pub fn main() !void {
         then = now;
 
         if (winch) {
-            try term.pixel_buf.resize(try term.getSize());
+            try term.screen.resize(try term.getSize());
             winch = false;
         }
 
-        try sht.render(&term.renderer);
-        try term.renderer.flush();
+        try renderer.render(&sht);
+        try term.screen.flush();
 
         while (input.next() catch continue :outer) |key| {
             if (insert_mode) {
@@ -153,7 +133,7 @@ pub fn main() !void {
                         term.clipboard = str;
                     },
                     .q => break :outer,
-                    .y => try term.clipboard.replaceAll(sht.getCurrentCell().str.bytes.items),
+                    .y => _ = try term.clipboard.replaceAll(sht.getCurrentCell().str.bytes.items),
                     .p => try sht.setCurrentCell(term.clipboard.bytes.items),
                     else => {},
                 }

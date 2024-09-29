@@ -1,10 +1,8 @@
 const std = @import("std");
 const Cell = @import("Cell.zig");
-const Renderer = @import("../render/Renderer.zig");
 const Style = @import("../render/Style.zig");
 const common = @import("../common.zig");
 const Key = @import("../input/Key.zig");
-const DisplayString = @import("../DisplayString.zig");
 
 const Sheet = @This();
 
@@ -13,6 +11,11 @@ cols: []usize,
 cells: []Cell,
 
 current: common.ipos = .{ 0, 0 },
+header_style: Style = .{
+    .fg = .black,
+    .bg = .cyan,
+    .bold = true,
+},
 
 pub fn init(allocator: std.mem.Allocator, rows: usize, cols: usize) !Sheet {
     const sht = Sheet{
@@ -32,82 +35,6 @@ pub fn init(allocator: std.mem.Allocator, rows: usize, cols: usize) !Sheet {
     return sht;
 }
 
-const header_style = Style{
-    .fg = .black,
-    .bg = .cyan,
-    .bold = true,
-};
-pub fn render(self: *const Sheet, renderer: *Renderer) !void {
-    const buf = renderer.buf;
-
-    // render sheetzu
-    const row_header_w = std.math.log10(self.cols.len) + 2;
-    for (0..row_header_w) |i| {
-        buf.pixels[i].style = .{
-            .fg = .cyan,
-        };
-    }
-    const sheetzu_idx = row_header_w - 3;
-    _ = renderer.renderUnicode(.{ 0, sheetzu_idx }, "•ᴥ•", null);
-
-    // render column headers
-    var col_offset: usize = row_header_w;
-    var bb26buf: [8]u8 = undefined;
-    header: for (self.cols, 0..) |w, i| {
-        const header = common.bb26(i, &bb26buf);
-        const padding = (w - header.len) / 2;
-        for (0..w) |cell_offset| {
-            if (col_offset + cell_offset >= renderer.buf.size[1]) break :header;
-
-            const px = &buf.pixels[col_offset + cell_offset];
-            px.style = header_style;
-            if (i == self.current[1]) px.style.reverse = true;
-            if (header.len + padding > cell_offset and cell_offset >= padding) {
-                px.setAscii(header[cell_offset - padding]);
-            }
-        }
-        col_offset += w;
-    }
-
-    var pd: [16]u8 = undefined;
-    @memset(&pd, 32);
-
-    var row_offset: usize = buf.size[1];
-    for (self.rows, 0..) |_, r| {
-        if (r >= buf.size[0] - 1) break;
-
-        const header = common.b10(r + 1);
-        const padding = row_header_w - header.len - 1;
-        for (0..row_header_w) |i| {
-            const px = &buf.pixels[row_offset + i];
-            px.style = header_style;
-            if (r == self.current[0]) px.style.reverse = true;
-            if (i >= padding and header.len + padding > i) {
-                px.setAscii(header[i - padding]);
-            }
-        }
-        col_offset = row_header_w;
-        col: for (self.cols, 0..) |w, c| {
-            const cell = self.cells[r * self.cols.len + c];
-            var pos = common.upos{ r + 1, col_offset };
-            const is_current = r == self.current[0] and c == self.current[1];
-            const rect = renderer.renderUnicode(
-                pos,
-                cell.str,
-                if (is_current) header_style else cell.style,
-            );
-            if (w < rect[1]) self.cols[c] = rect[1];
-            pos[1] += rect[1];
-            for (0..w - rect[1]) |_| {
-                pos += renderer.renderAscii(pos, pd[0..1], if (is_current) header_style else cell.style);
-            }
-            col_offset += w;
-            if (buf.size[1] <= col_offset) break :col;
-        }
-        row_offset += buf.size[1];
-    }
-}
-
 pub fn getCell(self: *const Sheet, position: common.upos) ?*Cell {
     if (position[0] >= self.rows.len or position[1] >= self.cols.len) return null;
     return &self.cells[position[0] * self.cols.len + position[1]];
@@ -121,7 +48,7 @@ pub fn setCell(self: *Sheet, position: common.upos, content: []const u8) !void {
     const row: usize = @intCast(position[0]);
     const col: usize = @intCast(position[1]);
     var cell = &self.cells[row * self.cols.len + col];
-    try cell.str.replaceAll(content);
+    _ = try cell.str.replaceAll(content);
     self.cols[col] = @max(self.cols[col], cell.str.display_width());
     cell.tick();
 }

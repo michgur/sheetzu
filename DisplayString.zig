@@ -91,7 +91,7 @@ pub fn deinit(self: *DisplayString) void {
     self.* = undefined;
 }
 
-pub fn replaceAll(self: *DisplayString, new_content: []const u8) !void {
+pub fn replaceAll(self: *DisplayString, new_content: []const u8) !*DisplayString {
     self.bytes.clearRetainingCapacity();
     self.graphemes.clearRetainingCapacity();
     try self.append(new_content);
@@ -101,6 +101,7 @@ pub fn replaceAll(self: *DisplayString, new_content: []const u8) !void {
     if (self.graphemes.capacity > self.graphemes.items.len) {
         self.graphemes.shrinkAndFree(self.graphemes.items.len);
     }
+    return self;
 }
 
 const Iterator = struct {
