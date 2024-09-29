@@ -1,5 +1,11 @@
 const std = @import("std");
 const DisplayString = @import("../DisplayString.zig");
+const common = @import("../common.zig");
+
+pub const Formula = struct {
+    depa: common.upos,
+    depb: common.upos,
+};
 
 pub const CellData = union(enum) {
     Numeral: i64,
@@ -23,3 +29,7 @@ fn parseNumeral(data: *const DisplayString) ?i64 {
     }
     return result;
 }
+
+// fn parseFormula(data: *const DisplayString) ?Formula {
+//     for ()
+// }

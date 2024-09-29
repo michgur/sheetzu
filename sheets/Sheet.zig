@@ -56,8 +56,9 @@ pub fn render(self: *const Sheet, renderer: *Renderer) !void {
 
     // render column headers
     var col_offset: usize = row_header_w;
+    var bb26buf: [8]u8 = undefined;
     header: for (self.cols, 0..) |w, i| {
-        const header = common.b26(i);
+        const header = common.bb26(i, &bb26buf);
         const padding = (w - header.len) / 2;
         for (0..w) |cell_offset| {
             if (col_offset + cell_offset >= renderer.buf.size[1]) break :header;
@@ -144,11 +145,4 @@ pub fn onInput(self: *Sheet, input: Key) !void {
         try cell.str.append(input.bytes);
         self.cols[col] = @max(self.cols[col], cell.str.display_width());
     }
-}
-
-pub fn tick(self: *Sheet) void {
-    const row: usize = @intCast(self.current[0]);
-    const col: usize = @intCast(self.current[1]);
-    var cell = &self.cells[row * self.cols.len + col];
-    cell.tick();
 }

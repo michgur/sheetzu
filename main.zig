@@ -131,7 +131,7 @@ pub fn main() !void {
             if (insert_mode) {
                 if (key.codepoint == .escape) {
                     if (insert_mode) {
-                        sht.tick();
+                        sht.getCurrentCell().tick();
                         insert_mode = false;
                     }
                 } else {

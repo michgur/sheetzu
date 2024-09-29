@@ -21,4 +21,9 @@ pub fn build(b: *std.Build) void {
     const exe_check = b.addExecutable(exe_opts);
     const check = b.step("check", "Check if foo compiles");
     check.dependOn(&exe_check.step);
+
+    // run step
+    const exe_run = b.addRunArtifact(exe);
+    const run = b.step("run", "Run the application");
+    run.dependOn(&exe_run.step);
 }
