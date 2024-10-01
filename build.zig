@@ -18,12 +18,20 @@ pub fn build(b: *std.Build) void {
     b.default_step.dependOn(&install.step);
 
     // "check" step
-    const exe_check = b.addExecutable(exe_opts);
-    const check = b.step("check", "Check if foo compiles");
-    check.dependOn(&exe_check.step);
+    const check_exe = b.addExecutable(exe_opts);
+    const check_step = b.step("check", "Check if foo compiles");
+    check_step.dependOn(&check_exe.step);
+
+    const unit_tests = b.addTest(.{
+        .root_source_file = b.path("src/tester.zig"),
+    });
+    unit_tests.addIncludePath(b.path("."));
+    const test_exe = b.addRunArtifact(unit_tests);
+    const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&test_exe.step);
 
     // run step
-    const exe_run = b.addRunArtifact(exe);
-    const run = b.step("run", "Run the application");
-    run.dependOn(&exe_run.step);
+    const run_exe = b.addRunArtifact(exe);
+    const run_step = b.step("run", "Run the application");
+    run_step.dependOn(&run_exe.step);
 }

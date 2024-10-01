@@ -63,41 +63,17 @@ pub const Sheet = struct {
     }
 };
 
-fn isCircularRef(sht: *const Sheet, selfref: common.upos, ast: *const AST) bool {
+pub fn isCircularRef(sht: *const Sheet, selfref: common.upos, ast: *const AST) bool {
     // todo: tweak to use .refers
-    if (ast.value) |v| if (v == .ref) {
-        const isDirectRef = @reduce(.And, v.ref == selfref);
-        const isNestedRef = if (sht.cell(v.ref)) |refed| isCircularRef(sht, selfref, &refed.ast) else false;
+    if (ast.value == .ref) {
+        const isDirectRef = @reduce(.And, ast.value.ref == selfref);
+        const isNestedRef = if (sht.cell(ast.value.ref)) |refed| isCircularRef(sht, selfref, &refed.ast) else false;
         return isDirectRef or isNestedRef;
-    };
-    if (ast.children) |children| {
-        for (children) |child| {
-            if (isCircularRef(sht, selfref, &child)) return true;
-        }
+    }
+    for (ast.children) |child| {
+        if (isCircularRef(sht, selfref, &child)) return true;
     }
     return false;
-}
-
-test "basic AST" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer if (gpa.deinit() != .ok) @panic("oops");
-    const allocator = gpa.allocator();
-
-    var sheet = Sheet.init(allocator, .{ 100, 100 }) catch @panic("Out of memory");
-    defer sheet.deinit();
-
-    sheet.cell(.{ 0, 0 }).?.ast = AST{ .value = .{ .number = 3 } };
-    sheet.cell(.{ 1, 1 }).?.ast = AST{ .value = .{ .ref = .{ 0, 0 } } };
-    sheet.cell(.{ 2, 3 }).?.ast = AST{ // C4=A1+B2
-        .op = .add,
-        .children = &.{
-            AST{ .value = .{ .ref = .{ 0, 0 } } },
-            AST{ .value = .{ .ref = .{ 1, 1 } } },
-        },
-    };
-    // A1=C4
-    try std.testing.expect(isCircularRef(&sheet, .{ 0, 0 }, &AST{ .value = .{ .ref = .{ 2, 3 } } }));
-    try std.testing.expectEqual(6, sheet.cell(.{ 2, 3 }).?.ast.evalNumeral(&sheet));
 }
 
 // each Cell should contain:

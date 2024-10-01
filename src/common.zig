@@ -79,4 +79,4 @@ pub fn b10(n: usize) []const u8 {
     return res;
 }
 
-pub const C = @cImport(@cInclude("wcwidth.c"));
+pub const C = @cImport(@cInclude("src/wcwidth.c"));
