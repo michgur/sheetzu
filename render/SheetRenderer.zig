@@ -149,11 +149,17 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
         for (sht.cols[offset[1]..], offset[1]..) |w, c| {
             var cell = sht.cells[r * sht.cols.len + c];
             const is_current = r == sht.current[0] and c == sht.current[1];
+            var cellstr = try cell.str.clone();
+            defer cellstr.deinit();
+            if (cell.data == .Formula) {
+                const result = sht.compute(cell.data.Formula);
+                _ = try cellstr.replaceAll(try std.fmt.bufPrint(&buf, "{d}", .{result}));
+            }
             self.renderCell(
                 w,
-                &cell.str,
+                &cellstr,
                 if (is_current) sht.header_style else cell.style,
-                .left,
+                if (cell.data == .Numeral) .right else .left,
             ) catch break;
         }
     }

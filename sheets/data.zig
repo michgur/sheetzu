@@ -40,8 +40,8 @@ fn parseFormula(data: *const DisplayString) ?Formula {
     const ac = if (f[1] <= 'Z' and f[1] >= 'A') f[1] - 'A' else return null;
     const bc = if (f[4] <= 'Z' and f[4] >= 'A') f[4] - 'A' else return null;
     if (f[3] != '+') return null;
-    const ar = if (f[2] <= '9' and f[2] >= '0') f[2] - '0' else return null;
-    const br = if (f[5] <= '9' and f[5] >= '0') f[5] - '0' else return null;
+    const ar = if (f[2] <= '9' and f[2] >= '0') f[2] - '1' else return null;
+    const br = if (f[5] <= '9' and f[5] >= '0') f[5] - '1' else return null;
     return Formula{
         .depa = .{ ar, ac },
         .depb = .{ br, bc },

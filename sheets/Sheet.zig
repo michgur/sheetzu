@@ -70,3 +70,18 @@ pub fn onInput(self: *Sheet, input: Key) !void {
         self.cols[col] = @max(self.cols[col], cell.str.display_width());
     }
 }
+
+const Formula = @import("data.zig").Formula;
+pub fn compute(self: *const Sheet, formula: Formula) i64 {
+    const cella = self.getCell(formula.depa) orelse return -1;
+    const cellb = self.getCell(formula.depb) orelse return -2;
+    const vala = switch (cella.data) {
+        .Numeral => |n| n,
+        else => return -3,
+    };
+    const valb = switch (cellb.data) {
+        .Numeral => |n| n,
+        else => return -4,
+    };
+    return vala + valb;
+}
