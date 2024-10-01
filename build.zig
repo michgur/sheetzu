@@ -4,7 +4,7 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const exe_opts = std.Build.ExecutableOptions{
         .name = "sheetzu",
-        .root_source_file = b.path("main.zig"),
+        .root_source_file = b.path("src/main.zig"),
         .target = b.standardTargetOptions(.{}),
         .optimize = b.standardOptimizeOption(.{}),
         .version = .{ .major = 0, .minor = 0, .patch = 1 },
