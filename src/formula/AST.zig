@@ -73,3 +73,25 @@ pub fn deinit(self: *AST, allocator: std.mem.Allocator) void {
     allocator.free(self.children);
     self.* = undefined;
 }
+
+pub fn allRefs(self: *const AST) []const common.upos {
+    const buf: [40]common.upos = undefined;
+    var i: usize = 0;
+    if (self.value == .ref) {
+        buf[0] = self.value.ref;
+        i = 1;
+    }
+    for (self.children) |child| {
+        const refs = child.allRefs();
+        for (refs) |r| {
+            for (buf, 0..i) |b, _| {
+                if (@reduce(.And, b == r)) break;
+            } else {
+                buf[i] = r;
+                i += 1;
+                if (i >= buf.len) @panic(std.fmt.comptimePrint("Oops, I thought {d} refs would be enough...", .{buf.len}));
+            }
+        }
+    }
+    return buf[0..i];
+}

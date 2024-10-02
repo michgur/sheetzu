@@ -19,6 +19,15 @@ const Cell = struct {
         self.refers.deinit();
         self.ast.deinit(self.refers.allocator); // should prolly be unmanaged
     }
+
+    pub fn removeRefer(self: *Cell, refer: common.upos) bool {
+        return for (self.refers.items, 0..) |r, i| {
+            if (@reduce(.And, r == refer)) {
+                self.refers.swapRemove(i);
+                break true;
+            }
+        } else false;
+    }
 };
 
 pub const Sheet = struct {
@@ -45,9 +54,19 @@ pub const Sheet = struct {
     }
 
     /// safe cell access
-    pub fn cell(self: *const Sheet, pos: common.upos) ?*Cell {
+    pub fn cell(self: *const Sheet, pos: common.upos) ?*const Cell {
         if (@reduce(.Or, pos >= self.size)) return null;
         return self.cells[pos[0]][pos[1]];
+    }
+
+    const Error = error{ CircularDependency, OutOfBounds };
+    pub fn placeAST(self: *const Sheet, pos: common.upos, ast: AST) Error!void {
+        var c = self.cell(pos) orelse return Error.OutOfBounds;
+        if (isCircularRef(self, pos, ast)) return Error.CircularDependency;
+        self.removeRefs(pos, c.ast);
+        self.placeRefs(pos, ast);
+        c.ast.deinit(self.allocator);
+        c.ast = ast;
     }
 
     pub fn deinit(self: *Sheet) void {
@@ -61,20 +80,51 @@ pub const Sheet = struct {
         self.allocator.free(self.cells[0..self.size[0]]);
         self.* = undefined;
     }
-};
 
-pub fn isCircularRef(sht: *const Sheet, selfref: common.upos, ast: *const AST) bool {
-    // todo: tweak to use .refers
-    if (ast.value == .ref) {
-        const isDirectRef = @reduce(.And, ast.value.ref == selfref);
-        const isNestedRef = if (sht.cell(ast.value.ref)) |refed| isCircularRef(sht, selfref, &refed.ast) else false;
-        return isDirectRef or isNestedRef;
+    /// whether `this` depends on `upon`. `upon` is out of bounds, returns false
+    pub fn dependsOn(self: *const Sheet, this: common.upos, upon: common.upos) bool {
+        const upon_cell = self.cell(upon) orelse return false;
+        if (@reduce(.And, this == upon)) return true;
+        return for (upon_cell.refers) |refer| {
+            if (@reduce(.And, this == refer)) break true;
+        } else false;
     }
-    for (ast.children) |child| {
-        if (isCircularRef(sht, selfref, &child)) return true;
+
+    /// whether placing `ast` on `pos` will cause a circluar dependency
+    /// i.e. the AST references a cell that depends on `pos`
+    fn isCircularRef(self: *const Sheet, pos: common.upos, ast: *const AST) bool {
+        if (ast.value == .ref) {
+            return self.dependsOn(ast.value.ref, pos);
+        }
+        for (ast.children) |child| {
+            if (self.isCircularRef(pos, &child)) return true;
+        }
+        return false;
     }
-    return false;
-}
+
+    fn placeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
+        if (ast.value == .ref) {
+            if (self.cell(ast.value.ref)) |c| {
+                c.refers.append(pos);
+            }
+        }
+        for (ast.children) |child| {
+            self.placeRefs(pos, child);
+        }
+    }
+
+    /// remove `pos` as a refer from all cells references by `ast`
+    fn removeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
+        if (ast.value == .ref) {
+            if (self.cell(ast.value.ref)) |c| {
+                _ = c.removeRefer(pos);
+            }
+        }
+        for (ast.children) |child| {
+            self.removeRefs(pos, child);
+        }
+    }
+};
 
 // each Cell should contain:
 // 1. AST - this is how the contents are computed on tick
