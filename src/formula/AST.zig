@@ -33,7 +33,7 @@ const Value = union(enum) {
     }
 };
 
-const Operator = enum { add, sub };
+const Operator = enum { add, sub, mul, div };
 
 op: ?Operator = null,
 value: Value = .{ .blank = {} },
@@ -48,6 +48,12 @@ pub fn eval(self: *const AST, sht: *const Sheet) Value {
             },
             .sub => return .{
                 .number = self.children[0].evalNumeral(sht) - self.children[1].evalNumeral(sht),
+            },
+            .mul => return .{
+                .number = self.children[0].evalNumeral(sht) * self.children[1].evalNumeral(sht),
+            },
+            .div => return .{
+                .number = self.children[0].evalNumeral(sht) / self.children[1].evalNumeral(sht),
             },
         }
     }

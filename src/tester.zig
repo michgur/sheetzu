@@ -3,6 +3,7 @@ const AST = @import("formula/AST.zig");
 const Sheet = @import("formula/Temp.zig").Sheet;
 const isCircularRef = @import("formula/Temp.zig").isCircularRef;
 const Tokenizer = @import("formula/Tokenizer.zig");
+const Parser = @import("formula/Parser.zig");
 
 test "basic AST" {
     std.testing.refAllDecls(@This());
@@ -14,23 +15,25 @@ test "basic AST" {
     var sheet = Sheet.init(allocator, .{ 100, 100 }) catch @panic("Out of memory");
     defer sheet.deinit();
 
-    sheet.cell(.{ 0, 0 }).?.ast = AST{ .value = .{ .number = 3 } };
-    sheet.cell(.{ 1, 1 }).?.ast = AST{ .value = .{ .ref = .{ 0, 0 } } };
-    // sheet.cell(.{ 2, 3 }).?.ast = AST{ // C4=A1+B2
-    //     .op = .add,
-    //     .children = @constCast(&[_]AST{
-    //         AST{ .value = .{ .ref = .{ 0, 0 } } },
-    //         AST{ .value = .{ .ref = .{ 1, 1 } } },
-    //     }),
-    // };
-    //
-    // // A1=C4
-    // try std.testing.expect(isCircularRef(&sheet, .{ 0, 0 }, &AST{ .value = .{ .ref = .{ 2, 3 } } }));
-    // try std.testing.expectEqual(6, sheet.cell(.{ 2, 3 }).?.ast.evalNumeral(&sheet));
-    try std.testing.expectEqual(6, AST.parse("=A1+B2").evalNumeral(&sheet));
+    sheet.cell(.{ 2, 0 }).?.ast = AST{ .value = .{ .number = -2.76 } };
+    sheet.cell(.{ 4, 1 }).?.ast = AST{ .value = .{ .ref = .{ 2, 0 } } };
 
-    var tokenizer = Tokenizer{ .input = "BANANA(A2+B4, 15.3)" };
-    while (tokenizer.next() catch @panic("Invalid formula provided")) |token| {
-        std.debug.print("{any}: {s}\n", .{ token.type, token.bytes });
+    const tokenizer = Tokenizer{ .input = "(A2 + B4) * -12.5" };
+    var parser = Parser{
+        .allocator = std.heap.page_allocator,
+        .tokenizer = tokenizer,
+    };
+    var result = parser.out() catch @panic("Invalid formula provided");
+    defer result.deinit();
+
+    printAST(&result, 0);
+    std.debug.print("=== {d}\n", .{result.evalNumeral(&sheet)});
+}
+
+const indent = "-" ** 40;
+fn printAST(ast: *const AST, level: usize) void {
+    std.debug.print("{s} {any}\n", .{ indent[0 .. level * 2], ast.value });
+    for (ast.children) |*child| {
+        printAST(child, level + 1);
     }
 }

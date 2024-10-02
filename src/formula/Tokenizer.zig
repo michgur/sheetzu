@@ -2,21 +2,30 @@ const std = @import("std");
 const Tokenizer = @This();
 
 input: []const u8,
+head: Error!Token = .{ .type = .ignore, .bytes = &.{} },
 
 pub const Error = error{
     InvalidChar,
     InvalidSyntax,
 };
 
-pub fn next(self: *Tokenizer) Error!?Token {
-    if (self.input.len == 0) return null;
-    const token = self.nextInternal() catch |err| return err;
-    self.input = self.input[token.bytes.len..];
-    if (token.type == .ignore) return self.next();
-    return token;
+pub fn consume(self: *Tokenizer) void {
+    if (self.input.len == 0) {
+        self.head = Token{
+            .type = .eof,
+            .bytes = &.{},
+        };
+        return;
+    }
+
+    self.head = self.readToken();
+    const head = self.head catch return;
+
+    self.input = self.input[head.bytes.len..];
+    if (head.type == .ignore) self.consume();
 }
 
-fn nextInternal(self: *Tokenizer) Error!Token {
+fn readToken(self: *Tokenizer) Error!Token {
     switch (self.input[0]) {
         '+' => return Token{ .bytes = self.input[0..1], .type = .plus },
         '-' => return Token{ .bytes = self.input[0..1], .type = .dash },
@@ -111,6 +120,7 @@ pub const Token = struct {
         dash,
         asterisk,
         forward_slash,
+        eof,
         ignore,
     };
 };
