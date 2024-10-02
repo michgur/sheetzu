@@ -31,6 +31,17 @@ const Value = union(enum) {
         }
         self.* = undefined;
     }
+
+    pub fn tostring(self: *const Value, allocator: std.mem.Allocator) DisplayString {
+        return switch (self.*) {
+            .string => |s| s,
+            .number => |n| DisplayString.initBytes(allocator, std.fmt.bufPrint(temp_buf, "{d}", n)),
+            .blank => DisplayString.init(allocator),
+            .err => |e| DisplayString.initBytes(allocator, e),
+            .ref => DisplayString.init(allocator), // not a real possibility, we don't evaluate to refs
+        };
+    }
+    const temp_buf: [1024]u8 = undefined;
 };
 
 const Operator = enum { add, sub, mul, div };

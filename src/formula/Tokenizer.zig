@@ -2,12 +2,18 @@ const std = @import("std");
 const Tokenizer = @This();
 
 input: []const u8,
-head: Error!Token = .{ .type = .ignore, .bytes = &.{} },
+head: Error!Token,
 
 pub const Error = error{
     InvalidChar,
     InvalidSyntax,
 };
+
+pub fn init(input: []const u8) Tokenizer {
+    const result = Tokenizer{ .input = input, .head = Token{ .type = .ignore, .bytes = &.{} } };
+    result.consume();
+    return result;
+}
 
 pub fn consume(self: *Tokenizer) void {
     if (self.input.len == 0) {

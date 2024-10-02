@@ -4,7 +4,8 @@ const DisplayString = @import("../DisplayString.zig");
 const AST = @import("AST.zig");
 
 const Cell = struct {
-    // value: Value, // future, cached value
+    value: AST.Value,
+    str: DisplayString,
     ast: AST,
     refers: std.ArrayList(common.upos),
 
@@ -12,6 +13,8 @@ const Cell = struct {
         return .{
             .ast = ast,
             .refers = std.ArrayList(common.upos).init(allocator),
+            .value = .{ .blank = {} },
+            .str = DisplayString.init(allocator),
         };
     }
 
@@ -27,6 +30,17 @@ const Cell = struct {
                 break true;
             }
         } else false;
+    }
+
+    pub fn tick(self: *Cell, sht: *const Sheet) void {
+        self.value = self.ast.eval(sht);
+        const str = self.value.tostring(self.str.bytes.allocator);
+        self.str.deinit();
+        self.str = str;
+
+        for (self.refers) |refer| {
+            refer.tick(sht);
+        }
     }
 };
 
@@ -67,6 +81,7 @@ pub const Sheet = struct {
         self.placeRefs(pos, ast);
         c.ast.deinit(self.allocator);
         c.ast = ast;
+        c.tick(self);
     }
 
     pub fn deinit(self: *Sheet) void {
@@ -125,8 +140,3 @@ pub const Sheet = struct {
         }
     }
 };
-
-// each Cell should contain:
-// 1. AST - this is how the contents are computed on tick
-// 2. List of ref
-// 3. Cached value - what's displayed
