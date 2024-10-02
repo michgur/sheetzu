@@ -31,7 +31,7 @@ pub fn out(self: *Parser) Error!AST {
     self.tokenizer.consume();
 
     var result = try self.parseExpression();
-    errdefer result.deinit();
+    errdefer result.deinit(self.allocator);
 
     const eof = try self.tokenizer.head;
     return if (eof.type == .eof) result else Error.ParsingError;
@@ -46,7 +46,7 @@ fn parsePrimary(self: *Parser) Error!AST {
         .open_paren => {
             self.tokenizer.consume();
             var result = try self.parseExpression();
-            errdefer result.deinit();
+            errdefer result.deinit(self.allocator);
 
             const last_token = try self.tokenizer.head;
             self.tokenizer.consume();
@@ -63,7 +63,7 @@ fn parsePrimary(self: *Parser) Error!AST {
 
 fn parseExpression(self: *Parser) Error!AST {
     var result = try self.parseTerm();
-    errdefer result.deinit();
+    errdefer result.deinit(self.allocator);
 
     while (true) {
         const token = try self.tokenizer.head;
@@ -86,7 +86,7 @@ fn parseExpression(self: *Parser) Error!AST {
 
 fn parseTerm(self: *Parser) Error!AST {
     var result = try self.parseFactor();
-    errdefer result.deinit();
+    errdefer result.deinit(self.allocator);
 
     while (true) {
         const next_token = try self.tokenizer.head;
@@ -112,7 +112,7 @@ fn parseFactor(self: *Parser) Error!AST {
     if (token.type == .dash) {
         self.tokenizer.consume();
         var result = try self.parsePrimary();
-        errdefer result.deinit();
+        errdefer result.deinit(self.allocator);
 
         if (result.value == .number) {
             result.value.number *= -1;

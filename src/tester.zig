@@ -20,11 +20,11 @@ test "basic AST" {
 
     const tokenizer = Tokenizer{ .input = "(A2 + B4) * -12.5" };
     var parser = Parser{
-        .allocator = std.heap.page_allocator,
+        .allocator = allocator,
         .tokenizer = tokenizer,
     };
     var result = parser.out() catch @panic("Invalid formula provided");
-    defer result.deinit();
+    defer result.deinit(allocator);
 
     printAST(&result, 0);
     std.debug.print("=== {d}\n", .{result.evalNumeral(&sheet)});

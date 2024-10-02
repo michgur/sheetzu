@@ -64,42 +64,12 @@ pub fn evalNumeral(self: *const AST, sht: *const Sheet) f64 {
     return self.eval(sht).numeralValue(sht);
 }
 
-pub fn deinit(self: *AST) void {
+pub fn deinit(self: *AST, allocator: std.mem.Allocator) void {
     // future - are children heap allocated?
-    self.value.deinit(std.heap.page_allocator);
+    self.value.deinit(allocator);
     for (self.children) |*child| {
-        child.deinit();
+        child.deinit(allocator);
     }
-    std.heap.page_allocator.free(self.children);
+    allocator.free(self.children);
     self.* = undefined;
-}
-
-fn parseValue(input: []const u8) Value {
-    if (input.len == 0) return .{ .blank = {} };
-    if (std.fmt.parseFloat(f64, input)) |f| {
-        return .{ .number = f };
-    } else |_| {}
-    return .{
-        .string = DisplayString.initBytes(
-            std.heap.page_allocator,
-            input,
-        ) catch @panic("Out of memory"),
-    };
-}
-
-pub fn parse(input: []const u8) AST {
-    const allocator = std.heap.page_allocator;
-    if (input[0] != '=') return AST{ .value = parseValue(input) };
-    const err = AST{ .value = .{
-        .err = std.fmt.allocPrint(allocator, "INVALID FORMULA", .{}) catch @panic("Out of memory"),
-    } };
-    const ac = if (input[1] <= 'Z' and input[1] >= 'A') input[1] - 'A' else return err;
-    const bc = if (input[4] <= 'Z' and input[4] >= 'A') input[4] - 'A' else return err;
-    if (input[3] != '+') return err;
-    const ar = if (input[2] <= '9' and input[2] >= '0') input[2] - '1' else return err;
-    const br = if (input[5] <= '9' and input[5] >= '0') input[5] - '1' else return err;
-    const children = allocator.alloc(AST, 2) catch @panic("Out of memory");
-    children[0] = AST{ .value = .{ .ref = .{ ar, ac } } };
-    children[1] = AST{ .value = .{ .ref = .{ br, bc } } };
-    return AST{ .op = .add, .children = children };
 }

@@ -17,7 +17,7 @@ const Cell = struct {
 
     pub fn deinit(self: *Cell) void {
         self.refers.deinit();
-        self.ast.deinit();
+        self.ast.deinit(self.refers.allocator); // should prolly be unmanaged
     }
 };
 
