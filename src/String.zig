@@ -98,8 +98,8 @@ pub fn replaceAll(self: *String, new_content: []const u8) !*String {
     if (self.bytes.capacity > self.bytes.items.len) {
         self.bytes.shrinkAndFree(self.bytes.items.len);
     }
-    if (self.codepoints.capacity > self.graphemes.items.len) {
-        self.codepoints.shrinkAndFree(self.graphemes.items.len);
+    if (self.codepoints.capacity > self.codepoints.items.len) {
+        self.codepoints.shrinkAndFree(self.codepoints.items.len);
     }
     return self;
 }
@@ -141,6 +141,6 @@ pub fn display_width(self: *const String) usize {
 pub fn clone(self: *const String) !String {
     return String{ // shallow copy is good enough here
         .bytes = try self.bytes.clone(),
-        .codepoints = try self.graphemes.clone(),
+        .codepoints = try self.codepoints.clone(),
     };
 }
