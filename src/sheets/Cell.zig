@@ -1,7 +1,8 @@
 const std = @import("std");
 const common = @import("../common.zig");
 const Style = @import("../render/Style.zig");
-const String = @import("../String.zig");
+const String = @import("../string/String.zig");
+const StringWriter = @import("../string/StringWriter.zig");
 const CellData = @import("data.zig").CellData;
 const AST = @import("../formula/AST.zig");
 const Sheet = @import("Sheet.zig");
@@ -12,7 +13,7 @@ const Cell = @This();
 style: Style,
 value: AST.Value,
 str: String,
-input: String,
+input: StringWriter,
 dirty: bool = false,
 ast: AST,
 refers: std.ArrayList(common.upos),
@@ -22,16 +23,16 @@ pub fn init(allocator: std.mem.Allocator) Cell {
         .ast = AST{},
         .refers = std.ArrayList(common.upos).init(allocator),
         .value = .{ .blank = {} },
-        .str = String.init(allocator),
-        .input = String.init(allocator),
+        .str = String.init(allocator, "") catch unreachable,
+        .input = StringWriter.init(allocator),
         .style = Style{},
     };
 }
 
 pub fn tick(self: *Cell, sht: *const Sheet) void {
     self.value = self.ast.eval(sht);
-    const str = self.value.tostring(self.str.bytes.allocator) catch unreachable;
-    self.str.deinit();
+    const str = self.value.tostring(sht.allocator) catch unreachable;
+    self.str.deinit(sht.allocator);
     self.str = str;
 
     for (self.refers.items) |refer| {
@@ -39,9 +40,9 @@ pub fn tick(self: *Cell, sht: *const Sheet) void {
     }
 }
 
-pub fn deinit(self: *Cell) void {
+pub fn deinit(self: *Cell, sht: *const Sheet) void {
     self.refers.deinit();
-    self.str.deinit();
+    self.str.deinit(sht.allocator);
     self.input.deinit();
     self.ast.deinit(self.refers.allocator); // should prolly be unmanaged
 }

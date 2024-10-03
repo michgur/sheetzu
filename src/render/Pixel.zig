@@ -1,6 +1,6 @@
 const std = @import("std");
 const Style = @import("Style.zig");
-const String = @import("../String.zig");
+const String = @import("../string/String.zig");
 const Codepoint = String.Codepoint;
 const CodepointInfo = String.CodepointInfo;
 

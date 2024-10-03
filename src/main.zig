@@ -4,7 +4,7 @@ const SheetRenderer = @import("render/SheetRenderer.zig");
 const Sheet = @import("sheets/Sheet.zig");
 const common = @import("common.zig");
 const Screen = @import("render/Screen.zig");
-const String = @import("String.zig");
+const String = @import("string/String.zig");
 
 const posix = std.posix;
 
@@ -15,7 +15,7 @@ raw_termios: posix.termios = undefined,
 orig_termios: posix.termios = undefined,
 uncooked: bool = false,
 screen: Screen = undefined,
-clipboard: String = undefined,
+clipboard: ?String = null,
 
 pub fn init() !Term {
     return Term{
@@ -81,7 +81,6 @@ pub fn main() !void {
     defer term.deinit();
 
     term.screen = try Screen.init(term.tty.writer(), allocator, try term.getSize());
-    term.clipboard = String.init(allocator);
 
     var sht = try Sheet.init(allocator, .{ 60, 100 });
     defer sht.deinit();
@@ -136,15 +135,27 @@ pub fn main() !void {
                         insert_mode = true;
                     },
                     .x => t: {
-                        const str = try sht.currentCell().str.clone();
-                        sht.setCurrentCell(String.init(allocator)) catch break :t;
+                        const str = try sht.currentCell().str.clone(allocator);
+                        sht.setCurrentCell(try String.init(allocator, &.{})) catch break :t;
 
-                        term.clipboard.deinit();
+                        if (term.clipboard) |*cb| {
+                            cb.deinit(allocator);
+                        }
                         term.clipboard = str;
                     },
+                    .y => {
+                        const str = try sht.currentCell().str.clone(allocator);
+                        if (term.clipboard) |*cb| {
+                            cb.deinit(allocator);
+                        }
+                        term.clipboard = str;
+                    },
+                    .p => {
+                        if (term.clipboard) |cb| {
+                            try sht.setCurrentCell(try cb.clone(allocator));
+                        }
+                    },
                     .q => break :outer,
-                    .y => _ = try term.clipboard.replaceAll(sht.currentCell().str.bytes.items),
-                    .p => try sht.setCurrentCell(term.clipboard),
                     else => {},
                 }
                 sht.current = @max(sht.current, common.ipos{ 0, 0 });

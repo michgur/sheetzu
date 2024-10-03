@@ -5,7 +5,8 @@ const common = @import("../common.zig");
 const Key = @import("../input/Key.zig");
 const AST = @import("../formula/AST.zig");
 const Parser = @import("../formula/Parser.zig");
-const String = @import("../String.zig");
+const String = @import("../string/String.zig");
+const StringWriter = @import("../string/StringWriter.zig");
 
 const Sheet = @This();
 
@@ -52,7 +53,7 @@ pub fn init(allocator: std.mem.Allocator, initial_size: common.upos) !Sheet {
 pub fn deinit(self: *Sheet) void {
     for (0..self.size[0]) |r| {
         for (0..self.size[1]) |c| {
-            self.cells[r][c].deinit();
+            self.cells[r][c].deinit(self);
             self.allocator.destroy(self.cells[r][c]);
         }
         self.allocator.free(self.cells[r][0..self.size[1]]);
@@ -75,38 +76,36 @@ pub inline fn currentCell(self: *const Sheet) *const Cell {
     return self.cell(common.posCast(self.current)) orelse unreachable;
 }
 
-// pub fn setCell(self: *Sheet, position: common.upos, content: []const u8) !void {
-//     const row: usize = @intCast(position[0]);
-//     const col: usize = @intCast(position[1]);
-//     var c = &self.cells[row * self.cols.len + col];
-//     _ = try c.str.replaceAll(content);
-//     self.cols[col] = @max(self.cols[col], c.str.display_width());
-//     c.tick();
-// }
-
-// pub inline fn setCurrentCell(self: *Sheet, content: []const u8) !void {
-//     try self.setCell(common.posCast(self.current), content);
-// }
-
 pub fn onInput(self: *Sheet, input: Key) !void {
-    const curr = common.posCast(self.current);
     var c: *Cell = @constCast(self.currentCell());
     c.dirty = true;
     if (input.codepoint == .backspace) {
-        if (c.input.codepoints.items.len > 0) {
-            c.input.remove(c.input.codepoints.items.len - 1);
-        }
+        _ = c.input.bytes.popOrNull();
     } else {
-        try c.input.append(input.bytes);
-        self.cols[curr[1]] = @max(self.cols[curr[1]], c.input.display_width());
+        try c.input.writer().writeAll(input.bytes);
     }
+}
+
+fn errorAST(allocator: std.mem.Allocator) AST {
+    const msg_stack = "!ERR";
+    const msg = allocator.alloc(u8, msg_stack.len) catch @panic("Out of memory");
+    @memcpy(msg, msg_stack);
+    return AST{ .value = .{ .err = msg } };
 }
 
 pub fn tick(self: *Sheet) void {
     var c = @constCast(self.currentCell());
     if (c.dirty) {
-        c.ast = Parser.parse(self.allocator, c.input.bytes.items) catch AST{
-            .value = .{ .err = "!ERR" },
+        var input = c.input.string() catch @panic("Out of memory");
+        defer input.deinit(self.allocator);
+        self.placeASTCurrent(
+            Parser.parse(self.allocator, input.bytes) catch errorAST(self.allocator),
+        ) catch |err| {
+            if (err == std.mem.Allocator.Error.OutOfMemory) {
+                @panic("Out of memory");
+            } else {
+                self.placeASTCurrent(errorAST(self.allocator)) catch @panic("Out of memory");
+            }
         };
         c.dirty = false;
     }
@@ -114,13 +113,14 @@ pub fn tick(self: *Sheet) void {
 }
 
 pub fn placeAST(self: *const Sheet, pos: common.upos, ast: AST) Error!void {
-    var c = @constCast(self.cell(pos)) orelse return Error.OutOfBounds;
+    var c: *Cell = @constCast(self.cell(pos)) orelse return Error.OutOfBounds;
     if (isCircularRef(self, pos, &ast)) return Error.CircularDependency;
     self.removeRefs(pos, &c.ast);
     self.placeRefs(pos, &ast);
     c.ast.deinit(self.allocator);
     c.ast = ast;
     c.tick(self);
+    self.cols[pos[1]] = @max(self.cols[pos[1]], c.str.displayWidth());
 }
 
 pub inline fn placeASTCurrent(self: *const Sheet, ast: AST) Error!void {
@@ -129,8 +129,9 @@ pub inline fn placeASTCurrent(self: *const Sheet, ast: AST) Error!void {
 
 pub fn setCell(self: *const Sheet, pos: common.upos, content: String) (Error || Parser.Error)!void {
     var c = self.varcell(pos) orelse return Error.OutOfBounds;
-    _ = try c.input.replaceAll(content.bytes.items);
-    const ast = try Parser.parse(self.allocator, content.bytes.items);
+    c.input.clearAndFree();
+    try c.input.writer().writeAll(content.bytes);
+    const ast = try Parser.parse(self.allocator, content.bytes);
     try self.placeAST(pos, ast);
 }
 

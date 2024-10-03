@@ -3,7 +3,8 @@ const common = @import("../common.zig");
 const Screen = @import("Screen.zig");
 const Sheet = @import("../sheets/Sheet.zig");
 const Style = @import("Style.zig");
-const String = @import("../String.zig");
+const String = @import("../string/String.zig");
+const StringWriter = @import("../string/StringWriter.zig");
 
 const SheetRenderer = @This();
 
@@ -38,12 +39,12 @@ inline fn penReset(self: *SheetRenderer) void {
 fn renderCell(
     self: *SheetRenderer,
     width: usize,
-    content: *String,
+    content: String,
     style: Style,
     alignment: enum { left, right, center },
 ) PenError!void {
     const EMPTY: u8 = '\x20';
-    const content_width = content.display_width();
+    const content_width = content.displayWidth();
     const left_padding = switch (alignment) {
         .left => 0,
         .center => (width -| content_width) / 2,
@@ -95,65 +96,82 @@ fn computeCellOffset(self: *SheetRenderer, sht: *const Sheet) void {
 }
 
 pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
-    var allocator = std.heap.stackFallback(2048, std.heap.page_allocator);
-    var buf: [16]u8 = undefined; // for string operations
-    var str = String.init(allocator.get());
-    defer str.deinit();
+    var render_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer render_arena.deinit();
+    const allocator = render_arena.allocator();
+    var str_writer = StringWriter.init(allocator);
+    var buf: [32]u8 = undefined; // for string operations
 
     self.penReset();
     self.computeCellOffset(sht);
 
-    try str.append(common.bb26(@intCast(sht.current[1]), &buf));
-    try str.append(":");
-    try str.append(try std.fmt.bufPrint(&buf, "{d}", .{sht.current[0] + 1}));
-    self.renderCell(
-        self.screen.size[1],
-        &str,
-        .{ .fg = .green },
-        .left,
-    ) catch {};
-    self.penDown() catch return;
-
-    self.renderCell(self.screen.size[1], try str.replaceAll(sht.currentCell().input.bytes.items), .{}, .left) catch {};
-    self.penDown() catch return;
-
-    // render sheetzu
-    const row_header_w = std.math.log10(sht.cols.len) + 2;
-    self.renderCell(
-        row_header_w,
-        try str.replaceAll("•ᴥ•"),
-        .{ .fg = .cyan },
-        .right,
-    ) catch {};
-
-    // render column headers
-    for (sht.cols[offset[1]..], offset[1]..) |w, i| {
-        const header = common.bb26(i, &buf);
-
-        var st = sht.header_style;
-        if (i == sht.current[1]) st.reverse = true;
-        self.renderCell(w, try str.replaceAll(header), st, .center) catch break;
+    { // render current ref
+        try str_writer.writer().print("{s}{d}", .{
+            common.bb26(@intCast(sht.current[1]), &buf),
+            sht.current[0] + 1,
+        });
+        var str = try str_writer.string();
+        defer str.deinit(allocator);
+        self.renderCell(
+            self.screen.size[1],
+            str,
+            .{ .fg = .green },
+            .left,
+        ) catch {};
+        self.penDown() catch return;
+    }
+    { // render input
+        const curr = sht.currentCell();
+        var str = if (curr.dirty) try String.init(allocator, curr.input.bytes.items) else curr.str;
+        defer if (curr.dirty) str.deinit(allocator);
+        self.renderCell(self.screen.size[1], str, .{}, .left) catch {};
+        self.penDown() catch return;
     }
 
+    const row_header_w = std.math.log10(sht.cols.len) + 2;
+    { // render sheetzu
+        var str = try String.init(allocator, "•ᴥ•");
+        defer str.deinit(allocator);
+        self.renderCell(
+            row_header_w,
+            str,
+            .{ .fg = .cyan },
+            .right,
+        ) catch {};
+    }
+    { // render column headers
+        for (sht.cols[offset[1]..], offset[1]..) |w, i| {
+            const header = common.bb26(i, &buf);
+            var str = try String.init(allocator, header);
+            defer str.deinit(allocator);
+
+            var st = sht.header_style;
+            if (i == sht.current[1]) st.reverse = true;
+            self.renderCell(w, str, st, .center) catch break;
+        }
+    }
+
+    // render rows
     for (sht.rows[offset[0]..], offset[0]..) |_, r| {
         self.penDown() catch break;
 
         // row header
-        const header = try str.replaceAll(try std.fmt.bufPrint(&buf, "{d}", .{r + 1}));
-        try header.append(&.{'\x20'});
+        try str_writer.writer().print("{d}\x20", .{r + 1});
+        var header = try str_writer.string();
+        defer header.deinit(allocator);
         var st = sht.header_style;
         if (r == sht.current[0]) st.reverse = true;
         self.renderCell(row_header_w, header, st, .right) catch continue;
 
         // row content
         for (sht.cols[offset[1]..], offset[1]..) |w, c| {
-            var cell = sht.cell(.{ r, c }) orelse break;
+            const cell = sht.cell(.{ r, c }) orelse break;
             const is_current = r == sht.current[0] and c == sht.current[1];
-            var cellstr = try (if (cell.dirty) cell.input else cell.str).clone();
-            defer cellstr.deinit();
+            var cellstr = if (cell.dirty) try String.init(allocator, cell.input.bytes.items) else cell.str;
+            defer if (cell.dirty) cellstr.deinit(allocator);
             self.renderCell(
                 w,
-                &cellstr,
+                cellstr,
                 if (is_current) sht.header_style else cell.style,
                 if (cell.value == .number) .right else .left,
             ) catch break;

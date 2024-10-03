@@ -1,7 +1,7 @@
 const std = @import("std");
 const common = @import("../common.zig");
 const Sheet = @import("../sheets/Sheet.zig");
-const String = @import("../String.zig");
+const String = @import("../string/String.zig");
 const AST = @This();
 
 pub const NAN = std.math.nan(f64);
@@ -18,14 +18,14 @@ pub const Value = union(enum) {
             .number => |f| f,
             .ref => |ref| if (sht.cell(ref)) |c| c.ast.evalNumeral(sht) else NAN,
             .blank, .err => NAN,
-            .string => |s| std.fmt.parseFloat(f64, s.bytes.items) catch NAN,
+            .string => |s| std.fmt.parseFloat(f64, s.bytes) catch NAN,
         };
         return result;
     }
 
     pub fn deinit(self: *Value, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .string => |*s| s.deinit(), // I'm strongly considering making this unmanaged
+            .string => |*s| s.deinit(allocator),
             .err => |e| allocator.free(e),
             else => {},
         }
@@ -35,10 +35,10 @@ pub const Value = union(enum) {
     pub fn tostring(self: *const Value, allocator: std.mem.Allocator) !String {
         return switch (self.*) {
             .string => |s| s,
-            .number => |n| String.initBytes(allocator, std.fmt.bufPrint(&temp_buf, "{d}", .{n}) catch "!ERR"),
-            .blank => String.init(allocator),
-            .err => |e| String.initBytes(allocator, e),
-            .ref => String.init(allocator), // not a real possibility, we don't evaluate to refs
+            .number => |n| try String.init(allocator, std.fmt.bufPrint(&temp_buf, "{d}", .{n}) catch "!ERR"),
+            .blank => try String.init(allocator, ""),
+            .err => |e| try String.init(allocator, e),
+            .ref => try String.init(allocator, "!REF"), // not a real possibility, we don't evaluate to refs
         };
     }
     var temp_buf: [1024]u8 = undefined;
