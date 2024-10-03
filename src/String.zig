@@ -20,11 +20,21 @@ pub const CodepointInfo = struct {
 
 pub const Codepoint = struct {
     info: CodepointInfo,
-    bytes: []const u8,
+    bytes: [4]u8,
+
+    pub fn init(info: CodepointInfo, bytes: []const u8) Codepoint {
+        std.debug.assert(bytes.len >= info.len and 4 >= info.len);
+
+        var b: [4]u8 = .{ 0, 0, 0, 0 };
+        @memcpy(b[0..info.len], bytes[0..info.len]);
+        return Codepoint{
+            .info = info,
+            .bytes = b,
+        };
+    }
 
     pub fn parseSingle(bytes: []const u8) Codepoint {
-        const info = CodepointInfo.parseSingle(bytes);
-        return .{ .bytes = bytes[0..info.len], .info = info };
+        return Codepoint.init(CodepointInfo.parseSingle(bytes), bytes);
     }
 };
 
@@ -119,10 +129,7 @@ const Iterator = struct {
             self.off += info.len;
             self.i += 1;
         }
-        return Codepoint{
-            .info = info,
-            .bytes = self.str.bytes.items[self.off .. self.off + info.len],
-        };
+        return Codepoint.init(info, self.str.bytes.items[self.off .. self.off + info.len]);
     }
 };
 

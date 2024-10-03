@@ -28,7 +28,7 @@ pub fn dump(self: *const Pixel, writer: anytype) !void {
 pub fn set(self: *Pixel, codepoint: Codepoint) void {
     self.codepoint = codepoint.info;
     self.codepoint.len = @min(self.codepoint.len, self.content.len); // future: handle longer codepoint clusters
-    @memcpy(self.content[0..codepoint.info.len], codepoint.bytes);
+    @memcpy(self.content[0..4], &codepoint.bytes);
 }
 
 pub fn setAscii(self: *Pixel, byte: u8) void {
