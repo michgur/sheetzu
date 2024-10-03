@@ -1,7 +1,7 @@
 const std = @import("std");
 const common = @import("../common.zig");
 const Sheet = @import("../sheets/Sheet.zig");
-const DisplayString = @import("../DisplayString.zig");
+const String = @import("../String.zig");
 const AST = @This();
 
 pub const NAN = std.math.nan(f64);
@@ -9,7 +9,7 @@ pub const NAN = std.math.nan(f64);
 pub const Value = union(enum) {
     blank: void,
     number: f64,
-    string: DisplayString,
+    string: String,
     ref: common.upos,
     err: []const u8,
 
@@ -32,13 +32,13 @@ pub const Value = union(enum) {
         self.* = undefined;
     }
 
-    pub fn tostring(self: *const Value, allocator: std.mem.Allocator) !DisplayString {
+    pub fn tostring(self: *const Value, allocator: std.mem.Allocator) !String {
         return switch (self.*) {
             .string => |s| s,
-            .number => |n| DisplayString.initBytes(allocator, std.fmt.bufPrint(&temp_buf, "{d}", .{n}) catch "!ERR"),
-            .blank => DisplayString.init(allocator),
-            .err => |e| DisplayString.initBytes(allocator, e),
-            .ref => DisplayString.init(allocator), // not a real possibility, we don't evaluate to refs
+            .number => |n| String.initBytes(allocator, std.fmt.bufPrint(&temp_buf, "{d}", .{n}) catch "!ERR"),
+            .blank => String.init(allocator),
+            .err => |e| String.initBytes(allocator, e),
+            .ref => String.init(allocator), // not a real possibility, we don't evaluate to refs
         };
     }
     var temp_buf: [1024]u8 = undefined;

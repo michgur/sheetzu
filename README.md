@@ -2,6 +2,7 @@
 sheets tui 🐶
 
 ## ideas (random order)
+- Next on the agenda: fix strings, make them immutable cause they're causing a mess
 ### UI
 - visual selection
 - command mode
@@ -9,9 +10,6 @@ sheets tui 🐶
 - virtual cursor in insert mode
 - infinite sheet (how does this work? chunks?)
 - custom file type with styling etc.
-### Logic
-- formula engine, with cell dependency trees
-    - maybe formulas are themselves trees (basically ASTs), where literals are leaves etc.
 ### Design
 - how should motions work? specifically long-text cells
     - this is not a text editor, maybe leave that part bare-bones

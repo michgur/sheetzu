@@ -4,7 +4,7 @@ const SheetRenderer = @import("render/SheetRenderer.zig");
 const Sheet = @import("sheets/Sheet.zig");
 const common = @import("common.zig");
 const Screen = @import("render/Screen.zig");
-const DisplayString = @import("DisplayString.zig");
+const String = @import("String.zig");
 
 const posix = std.posix;
 
@@ -15,7 +15,7 @@ raw_termios: posix.termios = undefined,
 orig_termios: posix.termios = undefined,
 uncooked: bool = false,
 screen: Screen = undefined,
-clipboard: DisplayString = undefined,
+clipboard: String = undefined,
 
 pub fn init() !Term {
     return Term{
@@ -81,7 +81,7 @@ pub fn main() !void {
     defer term.deinit();
 
     term.screen = try Screen.init(term.tty.writer(), allocator, try term.getSize());
-    term.clipboard = DisplayString.init(allocator);
+    term.clipboard = String.init(allocator);
 
     var sht = try Sheet.init(allocator, .{ 60, 100 });
     defer sht.deinit();
@@ -137,7 +137,7 @@ pub fn main() !void {
                     },
                     .x => t: {
                         const str = try sht.currentCell().str.clone();
-                        sht.setCurrentCell(DisplayString.init(allocator)) catch break :t;
+                        sht.setCurrentCell(String.init(allocator)) catch break :t;
 
                         term.clipboard.deinit();
                         term.clipboard = str;

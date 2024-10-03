@@ -2,7 +2,7 @@ const std = @import("std");
 const Pixel = @import("Pixel.zig");
 const Style = @import("Style.zig");
 const common = @import("../common.zig");
-const DisplayString = @import("../DisplayString.zig");
+const String = @import("../String.zig");
 
 const Screen = @This();
 

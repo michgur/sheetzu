@@ -1,7 +1,7 @@
 const std = @import("std");
 const common = @import("../common.zig");
 const Style = @import("../render/Style.zig");
-const DisplayString = @import("../DisplayString.zig");
+const String = @import("../String.zig");
 const CellData = @import("data.zig").CellData;
 const AST = @import("../formula/AST.zig");
 const Sheet = @import("Sheet.zig");
@@ -11,8 +11,8 @@ const Cell = @This();
 
 style: Style,
 value: AST.Value,
-str: DisplayString,
-input: DisplayString,
+str: String,
+input: String,
 dirty: bool = false,
 ast: AST,
 refers: std.ArrayList(common.upos),
@@ -22,8 +22,8 @@ pub fn init(allocator: std.mem.Allocator) Cell {
         .ast = AST{},
         .refers = std.ArrayList(common.upos).init(allocator),
         .value = .{ .blank = {} },
-        .str = DisplayString.init(allocator),
-        .input = DisplayString.init(allocator),
+        .str = String.init(allocator),
+        .input = String.init(allocator),
         .style = Style{},
     };
 }

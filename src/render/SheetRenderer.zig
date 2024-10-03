@@ -3,7 +3,7 @@ const common = @import("../common.zig");
 const Screen = @import("Screen.zig");
 const Sheet = @import("../sheets/Sheet.zig");
 const Style = @import("Style.zig");
-const DisplayString = @import("../DisplayString.zig");
+const String = @import("../String.zig");
 
 const SheetRenderer = @This();
 
@@ -14,7 +14,7 @@ inline fn put(self: *SheetRenderer, value: anytype, style: ?Style) void {
     var px = self.screen.getPixel(self.pen) orelse unreachable;
     switch (@TypeOf(value)) {
         u8 => px.setAscii(value),
-        DisplayString.Grapheme => px.set(value),
+        String.Codepoint => px.set(value),
         else => @compileError(std.fmt.comptimePrint("Unsupported render type {s}", .{@typeName(@TypeOf(value))})),
     }
     if (style) |st| px.style = st;
@@ -38,7 +38,7 @@ inline fn penReset(self: *SheetRenderer) void {
 fn renderCell(
     self: *SheetRenderer,
     width: usize,
-    content: *DisplayString,
+    content: *String,
     style: Style,
     alignment: enum { left, right, center },
 ) PenError!void {
@@ -97,7 +97,7 @@ fn computeCellOffset(self: *SheetRenderer, sht: *const Sheet) void {
 pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
     var allocator = std.heap.stackFallback(2048, std.heap.page_allocator);
     var buf: [16]u8 = undefined; // for string operations
-    var str = DisplayString.init(allocator.get());
+    var str = String.init(allocator.get());
     defer str.deinit();
 
     self.penReset();

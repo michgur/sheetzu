@@ -5,7 +5,7 @@ const common = @import("../common.zig");
 const Key = @import("../input/Key.zig");
 const AST = @import("../formula/AST.zig");
 const Parser = @import("../formula/Parser.zig");
-const DisplayString = @import("../DisplayString.zig");
+const String = @import("../String.zig");
 
 const Sheet = @This();
 
@@ -127,14 +127,14 @@ pub inline fn placeASTCurrent(self: *const Sheet, ast: AST) Error!void {
     try self.placeAST(common.posCast(self.current), ast);
 }
 
-pub fn setCell(self: *const Sheet, pos: common.upos, content: DisplayString) (Error || Parser.Error)!void {
+pub fn setCell(self: *const Sheet, pos: common.upos, content: String) (Error || Parser.Error)!void {
     var c = self.varcell(pos) orelse return Error.OutOfBounds;
     _ = try c.input.replaceAll(content.bytes.items);
     const ast = try Parser.parse(self.allocator, content.bytes.items);
     try self.placeAST(pos, ast);
 }
 
-pub fn setCurrentCell(self: *const Sheet, content: DisplayString) (Error || Parser.Error)!void {
+pub fn setCurrentCell(self: *const Sheet, content: String) (Error || Parser.Error)!void {
     try self.setCell(common.posCast(self.current), content);
 }
 

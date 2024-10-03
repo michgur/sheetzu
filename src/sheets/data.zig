@@ -1,5 +1,5 @@
 const std = @import("std");
-const DisplayString = @import("../DisplayString.zig");
+const String = @import("../String.zig");
 const common = @import("../common.zig");
 
 pub const Formula = struct {
@@ -9,11 +9,11 @@ pub const Formula = struct {
 
 pub const CellData = union(enum) {
     Numeral: i64,
-    String: *const DisplayString,
+    String: *const String,
     Blank: void,
     Formula: Formula,
 
-    pub fn parse(data: *const DisplayString) CellData {
+    pub fn parse(data: *const String) CellData {
         if (parseNumeral(data)) |n| {
             return .{ .Numeral = n };
         }
@@ -24,7 +24,7 @@ pub const CellData = union(enum) {
     }
 };
 
-fn parseNumeral(data: *const DisplayString) ?i64 {
+fn parseNumeral(data: *const String) ?i64 {
     var result: i64 = 0;
     for (data.bytes.items) |b| {
         if (b < '0' or b > '9') return null;
@@ -34,7 +34,7 @@ fn parseNumeral(data: *const DisplayString) ?i64 {
     return result;
 }
 
-fn parseFormula(data: *const DisplayString) ?Formula {
+fn parseFormula(data: *const String) ?Formula {
     const f = data.bytes.items;
     if (f[0] != '=') return null;
     const ac = if (f[1] <= 'Z' and f[1] >= 'A') f[1] - 'A' else return null;

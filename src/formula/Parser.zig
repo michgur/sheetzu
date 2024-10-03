@@ -19,7 +19,7 @@ const std = @import("std");
 const common = @import("../common.zig");
 const Tokenizer = @import("Tokenizer.zig");
 const AST = @import("AST.zig");
-const DisplayString = @import("../DisplayString.zig");
+const String = @import("../String.zig");
 const Parser = @This();
 
 tokenizer: Tokenizer,
@@ -37,14 +37,14 @@ pub fn parse(allocator: std.mem.Allocator, input: []const u8) Error!AST {
 // currently can only be a string or a number
 fn parseRaw(self: *Parser, bytes: []const u8) Error!AST {
     const token = self.tokenizer.head catch return AST{ .value = .{
-        .string = try DisplayString.initBytes(self.allocator, bytes),
+        .string = try String.initBytes(self.allocator, bytes),
     } };
     return switch (token.type) {
         .number => AST{ .value = .{
             .number = std.fmt.parseFloat(f64, token.bytes) catch return Error.ParsingError,
         } },
         else => AST{ .value = .{
-            .string = try DisplayString.initBytes(self.allocator, bytes),
+            .string = try String.initBytes(self.allocator, bytes),
         } },
     };
 }
@@ -148,7 +148,7 @@ fn parseString(self: *Parser) Error!AST {
     defer self.tokenizer.consume();
     return AST{
         .value = .{
-            .string = try DisplayString.initBytes(self.allocator, token.bytes),
+            .string = try String.initBytes(self.allocator, token.bytes),
         },
     };
 }
