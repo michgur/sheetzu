@@ -71,7 +71,7 @@ fn dump(self: *const Screen, writer: anytype) !void {
             defer px.* = Pixel.BLANK;
 
             try px.dump(writer);
-            c += @max(1, px.grapheme.display_width);
+            c += @max(1, px.codepoint.display_width);
         }
     }
 }

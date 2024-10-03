@@ -93,8 +93,8 @@ pub fn onInput(self: *Sheet, input: Key) !void {
     var c: *Cell = @constCast(self.currentCell());
     c.dirty = true;
     if (input.codepoint == .backspace) {
-        if (c.input.graphemes.items.len > 0) {
-            c.input.remove(c.input.graphemes.items.len - 1);
+        if (c.input.codepoints.items.len > 0) {
+            c.input.remove(c.input.codepoints.items.len - 1);
         }
     } else {
         try c.input.append(input.bytes);

@@ -29,18 +29,18 @@ pub const Codepoint = struct {
 };
 
 bytes: std.ArrayList(u8),
-graphemes: std.ArrayList(CodepointInfo),
+codepoints: std.ArrayList(CodepointInfo),
 
 pub fn init(allocator: std.mem.Allocator) String {
     return String{
         .bytes = std.ArrayList(u8).init(allocator),
-        .graphemes = std.ArrayList(CodepointInfo).init(allocator),
+        .codepoints = std.ArrayList(CodepointInfo).init(allocator),
     };
 }
 pub fn initCapacity(allocator: std.mem.Allocator, len: usize) !String {
     return String{
         .bytes = try std.ArrayList(u8).initCapacity(allocator, len),
-        .graphemes = try std.ArrayList(CodepointInfo).initCapacity(allocator, len),
+        .codepoints = try std.ArrayList(CodepointInfo).initCapacity(allocator, len),
     };
 }
 pub fn initBytes(allocator: std.mem.Allocator, bytes: []const u8) !String {
@@ -55,7 +55,7 @@ pub fn append(self: *String, data: []const u8) !void {
     var s = data;
     while (s.len > 0) {
         const cp = CodepointInfo.parseSingle(s);
-        try self.graphemes.append(cp);
+        try self.codepoints.append(cp);
         s = s[@max(1, cp.len)..];
     }
 }
@@ -63,43 +63,43 @@ pub fn append(self: *String, data: []const u8) !void {
 fn byteIndexOf(self: *const String, i: usize) usize {
     var result: usize = 0;
     for (0..i) |j| {
-        result += self.graphemes.items[j].len;
+        result += self.codepoints.items[j].len;
     }
     return result;
 }
 
 pub fn remove(self: *String, i: usize) void {
     const idx = self.byteIndexOf(i);
-    const cplen = self.graphemes.orderedRemove(i).len;
+    const cplen = self.codepoints.orderedRemove(i).len;
     std.mem.copyForwards(u8, self.bytes.items[idx..], self.bytes.items[idx + cplen ..]);
     self.bytes.shrinkAndFree(self.bytes.items.len - cplen);
 }
 
 pub fn removeRange(self: *String, from: usize, to: usize) void {
     const start = self.byteIndexOf(from);
-    const end = self.byteIndexOf(to) + self.graphemes.items[to].len;
+    const end = self.byteIndexOf(to) + self.codepoints.items[to].len;
     std.mem.copyForwards(u8, self.bytes.items[start..], self.bytes.items[end..]);
     self.bytes.shrinkAndFree(self.bytes.items.len + start - end);
     for (from..to + 1) |_| {
-        _ = self.graphemes.orderedRemove(from);
+        _ = self.codepoints.orderedRemove(from);
     }
 }
 
 pub fn deinit(self: *String) void {
     self.bytes.deinit();
-    self.graphemes.deinit();
+    self.codepoints.deinit();
     self.* = undefined;
 }
 
 pub fn replaceAll(self: *String, new_content: []const u8) !*String {
     self.bytes.clearRetainingCapacity();
-    self.graphemes.clearRetainingCapacity();
+    self.codepoints.clearRetainingCapacity();
     try self.append(new_content);
     if (self.bytes.capacity > self.bytes.items.len) {
         self.bytes.shrinkAndFree(self.bytes.items.len);
     }
-    if (self.graphemes.capacity > self.graphemes.items.len) {
-        self.graphemes.shrinkAndFree(self.graphemes.items.len);
+    if (self.codepoints.capacity > self.graphemes.items.len) {
+        self.codepoints.shrinkAndFree(self.graphemes.items.len);
     }
     return self;
 }
@@ -110,11 +110,11 @@ const Iterator = struct {
     off: usize = 0,
 
     pub fn next(self: *Iterator) ?Codepoint {
-        if (self.i >= self.str.graphemes.items.len) {
+        if (self.i >= self.str.codepoints.items.len) {
             return null;
         }
 
-        const info = self.str.graphemes.items[self.i];
+        const info = self.str.codepoints.items[self.i];
         defer {
             self.off += info.len;
             self.i += 1;
@@ -132,7 +132,7 @@ pub fn iterator(self: *const String) Iterator {
 
 pub fn display_width(self: *const String) usize {
     var result: usize = 0;
-    for (self.graphemes.items) |cp| {
+    for (self.codepoints.items) |cp| {
         result += cp.display_width;
     }
     return result;
@@ -141,6 +141,6 @@ pub fn display_width(self: *const String) usize {
 pub fn clone(self: *const String) !String {
     return String{ // shallow copy is good enough here
         .bytes = try self.bytes.clone(),
-        .graphemes = try self.graphemes.clone(),
+        .codepoints = try self.graphemes.clone(),
     };
 }

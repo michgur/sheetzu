@@ -57,9 +57,9 @@ fn renderCell(
     }
 
     var iter = content.iterator();
-    while (iter.next()) |grapheme| {
-        self.put(grapheme, style);
-        try self.penNext(grapheme.info.display_width);
+    while (iter.next()) |codepoint| {
+        self.put(codepoint, style);
+        try self.penNext(codepoint.info.display_width);
     }
 
     for (0..right_padding) |_| {
