@@ -67,16 +67,25 @@ pub fn uncook(self: *Term) !void {
 }
 
 pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    defer switch (gpa.deinit()) {
+        .leak => {
+            std.debug.print("oops, leaky time!", .{});
+        },
+        .ok => {},
+    };
+
     var term = try Term.init();
     try term.uncook();
     defer term.deinit();
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
     term.screen = try Screen.init(term.tty.writer(), allocator, try term.getSize());
     term.clipboard = DisplayString.init(allocator);
 
-    var sht = try Sheet.init(std.heap.page_allocator, 60, 100);
+    var sht = try Sheet.init(allocator, .{ 60, 100 });
+    defer sht.deinit();
+
     var renderer = SheetRenderer{ .screen = &term.screen };
 
     try posix.sigaction(posix.SIG.WINCH, &posix.Sigaction{
@@ -93,7 +102,7 @@ pub fn main() !void {
     var then = std.time.nanoTimestamp();
     outer: while (true) {
         const now = std.time.nanoTimestamp();
-        const dt: u64 = @intCast(now - then);
+        const dt: u64 = @intCast(@as(i64, @truncate(now - then)));
         if (dt < npf) {
             std.time.sleep(dt);
         }
@@ -111,7 +120,7 @@ pub fn main() !void {
             if (insert_mode) {
                 if (key.codepoint == .escape) {
                     if (insert_mode) {
-                        sht.getCurrentCell().tick();
+                        sht.tick();
                         insert_mode = false;
                     }
                 } else {
@@ -127,27 +136,21 @@ pub fn main() !void {
                         insert_mode = true;
                     },
                     .x => t: {
-                        const str = try sht.getCurrentCell().str.clone();
-                        sht.setCurrentCell(&.{}) catch break :t;
+                        const str = try sht.currentCell().str.clone();
+                        sht.setCurrentCell(DisplayString.init(allocator)) catch break :t;
+
                         term.clipboard.deinit();
                         term.clipboard = str;
                     },
                     .q => break :outer,
-                    .y => _ = try term.clipboard.replaceAll(sht.getCurrentCell().str.bytes.items),
-                    .p => try sht.setCurrentCell(term.clipboard.bytes.items),
+                    .y => _ = try term.clipboard.replaceAll(sht.currentCell().str.bytes.items),
+                    .p => try sht.setCurrentCell(term.clipboard),
                     else => {},
                 }
                 sht.current = @max(sht.current, common.ipos{ 0, 0 });
                 sht.current = @min(sht.current, common.ipos{ @intCast(sht.rows.len - 1), @intCast(sht.cols.len - 1) });
             }
         }
-    }
-
-    switch (gpa.deinit()) {
-        .leak => {
-            std.debug.print("oops, leaky time!", .{});
-        },
-        .ok => {},
     }
 }
 

@@ -28,9 +28,9 @@ allocator: std.mem.Allocator,
 pub const Error = Tokenizer.Error || error{ParsingError} || std.mem.Allocator.Error;
 
 pub fn parse(allocator: std.mem.Allocator, input: []const u8) Error!AST {
-    const is_formula = input[0] == '=';
+    const is_formula = input.len > 0 and input[0] == '=';
     const tokenizer = Tokenizer.init(if (is_formula) input[1..] else input);
-    const parser = Parser{ .tokenizer = tokenizer, .allocator = allocator };
+    var parser = Parser{ .tokenizer = tokenizer, .allocator = allocator };
     return if (is_formula) parser.parseFormula() else parser.parseRaw(input);
 }
 
@@ -50,8 +50,6 @@ fn parseRaw(self: *Parser, bytes: []const u8) Error!AST {
 }
 
 fn parseFormula(self: *Parser) Error!AST {
-    self.tokenizer.consume();
-
     var result = try self.parseExpression();
     errdefer result.deinit(self.allocator);
 
@@ -179,5 +177,3 @@ fn parseRef(self: *Parser) Error!AST {
         .value = .{ .ref = .{ row_idx, col_idx } },
     };
 }
-
-

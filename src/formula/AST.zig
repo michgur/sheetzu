@@ -1,12 +1,12 @@
 const std = @import("std");
 const common = @import("../common.zig");
-const Sheet = @import("Temp.zig").Sheet;
+const Sheet = @import("../sheets/Sheet.zig");
 const DisplayString = @import("../DisplayString.zig");
 const AST = @This();
 
 pub const NAN = std.math.nan(f64);
 
-const Value = union(enum) {
+pub const Value = union(enum) {
     blank: void,
     number: f64,
     string: DisplayString,
@@ -32,16 +32,16 @@ const Value = union(enum) {
         self.* = undefined;
     }
 
-    pub fn tostring(self: *const Value, allocator: std.mem.Allocator) DisplayString {
+    pub fn tostring(self: *const Value, allocator: std.mem.Allocator) !DisplayString {
         return switch (self.*) {
             .string => |s| s,
-            .number => |n| DisplayString.initBytes(allocator, std.fmt.bufPrint(temp_buf, "{d}", n)),
+            .number => |n| DisplayString.initBytes(allocator, std.fmt.bufPrint(&temp_buf, "{d}", .{n}) catch "!ERR"),
             .blank => DisplayString.init(allocator),
             .err => |e| DisplayString.initBytes(allocator, e),
             .ref => DisplayString.init(allocator), // not a real possibility, we don't evaluate to refs
         };
     }
-    const temp_buf: [1024]u8 = undefined;
+    var temp_buf: [1024]u8 = undefined;
 };
 
 const Operator = enum { add, sub, mul, div };

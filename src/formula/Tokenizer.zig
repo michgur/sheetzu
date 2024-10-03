@@ -10,7 +10,7 @@ pub const Error = error{
 };
 
 pub fn init(input: []const u8) Tokenizer {
-    const result = Tokenizer{ .input = input, .head = Token{ .type = .ignore, .bytes = &.{} } };
+    var result = Tokenizer{ .input = input, .head = Token{ .type = .ignore, .bytes = &.{} } };
     result.consume();
     return result;
 }

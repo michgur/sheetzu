@@ -1,6 +1,6 @@
 const std = @import("std");
 const AST = @import("formula/AST.zig");
-const Sheet = @import("formula/Temp.zig").Sheet;
+const Sheet = @import("sheets/Sheet.zig");
 const isCircularRef = @import("formula/Temp.zig").isCircularRef;
 const Tokenizer = @import("formula/Tokenizer.zig");
 const Parser = @import("formula/Parser.zig");
@@ -15,19 +15,16 @@ test "basic AST" {
     var sheet = Sheet.init(allocator, .{ 100, 100 }) catch @panic("Out of memory");
     defer sheet.deinit();
 
-    sheet.cell(.{ 2, 0 }).?.ast = AST{ .value = .{ .number = -2.76 } };
-    sheet.cell(.{ 4, 1 }).?.ast = AST{ .value = .{ .ref = .{ 2, 0 } } };
+    try sheet.placeAST(.{ 2, 0 }, AST{ .value = .{ .number = -2.76 } });
+    try sheet.placeAST(.{ 4, 1 }, AST{ .value = .{ .ref = .{ 2, 0 } } });
 
-    const tokenizer = Tokenizer{ .input = "(A2 + B4) * -12.5" };
-    var parser = Parser{
-        .allocator = allocator,
-        .tokenizer = tokenizer,
-    };
-    var result = parser.out() catch @panic("Invalid formula provided");
-    defer result.deinit(allocator);
+    var curr = @constCast(sheet.currentCell());
+    _ = try curr.input.replaceAll("= (A2 + B4) * -12.5");
+    curr.dirty = true;
+    sheet.tick();
 
-    printAST(&result, 0);
-    std.debug.print("=== {d}\n", .{result.evalNumeral(&sheet)});
+    printAST(&curr.ast, 0);
+    std.debug.print("=== {d}\n", .{curr.ast.evalNumeral(&sheet)});
 }
 
 const indent = "-" ** 40;

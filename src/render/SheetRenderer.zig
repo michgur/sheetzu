@@ -46,10 +46,10 @@ fn renderCell(
     const content_width = content.display_width();
     const left_padding = switch (alignment) {
         .left => 0,
-        .center => @max(0, width - content_width) / 2,
-        .right => @max(0, width - content_width), // this seems wrong
+        .center => (width -| content_width) / 2,
+        .right => width -| content_width, // this seems wrong
     };
-    const right_padding = @max(0, width - content_width - left_padding);
+    const right_padding = width -| content_width -| left_padding;
 
     for (0..left_padding) |_| {
         self.put(EMPTY, style);
@@ -114,7 +114,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
     ) catch {};
     self.penDown() catch return;
 
-    self.renderCell(self.screen.size[1], try str.replaceAll(sht.getCurrentCell().str.bytes.items), .{}, .left) catch {};
+    self.renderCell(self.screen.size[1], try str.replaceAll(sht.currentCell().input.bytes.items), .{}, .left) catch {};
     self.penDown() catch return;
 
     // render sheetzu
@@ -147,19 +147,15 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
 
         // row content
         for (sht.cols[offset[1]..], offset[1]..) |w, c| {
-            var cell = sht.cells[r * sht.cols.len + c];
+            var cell = sht.cell(.{ r, c }) orelse break;
             const is_current = r == sht.current[0] and c == sht.current[1];
-            var cellstr = try cell.str.clone();
+            var cellstr = try (if (cell.dirty) cell.input else cell.str).clone();
             defer cellstr.deinit();
-            if (cell.data == .Formula) {
-                const result = sht.compute(cell.data.Formula);
-                _ = try cellstr.replaceAll(try std.fmt.bufPrint(&buf, "{d}", .{result}));
-            }
             self.renderCell(
                 w,
                 &cellstr,
                 if (is_current) sht.header_style else cell.style,
-                if (cell.data == .Numeral) .right else .left,
+                if (cell.value == .number) .right else .left,
             ) catch break;
         }
     }

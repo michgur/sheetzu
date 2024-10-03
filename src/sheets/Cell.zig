@@ -1,28 +1,56 @@
 const std = @import("std");
-const Position = @import("../common.zig").ipos;
+const common = @import("../common.zig");
 const Style = @import("../render/Style.zig");
 const DisplayString = @import("../DisplayString.zig");
 const CellData = @import("data.zig").CellData;
+const AST = @import("../formula/AST.zig");
+const Sheet = @import("Sheet.zig");
 
 const Cell = @This();
+// data: CellData,
 
-str: DisplayString,
 style: Style,
-data: CellData,
+value: AST.Value,
+str: DisplayString,
+input: DisplayString,
+dirty: bool = false,
+ast: AST,
+refers: std.ArrayList(common.upos),
 
 pub fn init(allocator: std.mem.Allocator) Cell {
-    return Cell{
+    return .{
+        .ast = AST{},
+        .refers = std.ArrayList(common.upos).init(allocator),
+        .value = .{ .blank = {} },
         .str = DisplayString.init(allocator),
+        .input = DisplayString.init(allocator),
         .style = Style{},
-        .data = .{ .Blank = {} },
     };
 }
 
-pub fn tick(self: *Cell) void {
-    self.data = CellData.parse(&self.str);
-    switch (self.data) {
-        .Numeral => self.style.fg = .green,
-        .Formula => self.style.fg = .red,
-        else => self.style.fg = .none,
+pub fn tick(self: *Cell, sht: *const Sheet) void {
+    self.value = self.ast.eval(sht);
+    const str = self.value.tostring(self.str.bytes.allocator) catch unreachable;
+    self.str.deinit();
+    self.str = str;
+
+    for (self.refers.items) |refer| {
+        if (sht.cell(refer)) |r| @constCast(r).tick(sht);
     }
+}
+
+pub fn deinit(self: *Cell) void {
+    self.refers.deinit();
+    self.str.deinit();
+    self.input.deinit();
+    self.ast.deinit(self.refers.allocator); // should prolly be unmanaged
+}
+
+pub fn removeRefer(self: *Cell, refer: common.upos) bool {
+    return for (self.refers.items, 0..) |r, i| {
+        if (@reduce(.And, r == refer)) {
+            _ = self.refers.swapRemove(i);
+            break true;
+        }
+    } else false;
 }
