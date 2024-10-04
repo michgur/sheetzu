@@ -8,7 +8,7 @@ const StringWriter = @import("../string/StringWriter.zig");
 
 const SheetRenderer = @This();
 
-screen: *Screen,
+screen: *const Screen,
 pen: common.upos = .{ 0, 0 },
 
 inline fn put(self: *SheetRenderer, value: anytype, style: ?Style) void {

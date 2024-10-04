@@ -1,72 +1,11 @@
 const std = @import("std");
-const Input = @import("input/Input.zig");
 const SheetRenderer = @import("render/SheetRenderer.zig");
 const Sheet = @import("sheets/Sheet.zig");
 const Cell = @import("sheets/Cell.zig");
-const common = @import("common.zig");
 const Screen = @import("render/Screen.zig");
+const common = @import("common.zig");
 const String = @import("string/String.zig");
-
-const posix = std.posix;
-
-const Term = @This();
-
-tty: std.fs.File,
-raw_termios: posix.termios = undefined,
-orig_termios: posix.termios = undefined,
-uncooked: bool = false,
-screen: Screen = undefined,
-clipboard: ?String = null,
-
-pub fn init() !Term {
-    return Term{
-        .tty = try std.fs.cwd().openFile("/dev/tty", .{ .mode = .read_write }),
-    };
-}
-
-pub fn deinit(self: *Term) void {
-    if (self.clipboard) |*cb| cb.deinit(self.screen.allocator);
-    self.screen.deinit();
-
-    self.cook() catch {};
-    self.tty.close();
-}
-
-pub fn cook(self: *Term) !void {
-    if (!self.uncooked) return;
-    defer self.uncooked = false;
-
-    try posix.tcsetattr(self.tty.handle, .FLUSH, self.orig_termios);
-}
-
-pub fn uncook(self: *Term) !void {
-    if (self.uncooked) return;
-    defer self.uncooked = true;
-
-    self.orig_termios = try posix.tcgetattr(self.tty.handle);
-    errdefer self.cook() catch {};
-
-    self.raw_termios = self.orig_termios;
-    self.raw_termios.lflag.ECHO = false;
-    self.raw_termios.lflag.ECHONL = false;
-    self.raw_termios.lflag.ICANON = false;
-    self.raw_termios.lflag.ISIG = false;
-    self.raw_termios.lflag.IEXTEN = false;
-    self.raw_termios.iflag.IGNCR = false;
-    self.raw_termios.iflag.INLCR = false;
-    self.raw_termios.iflag.PARMRK = false;
-    self.raw_termios.iflag.IGNBRK = false;
-    self.raw_termios.iflag.IXON = false;
-    // self.raw_termios.iflag.ICRNL = false;
-    self.raw_termios.iflag.BRKINT = false;
-    self.raw_termios.iflag.ISTRIP = false;
-    self.raw_termios.oflag.OPOST = false;
-    self.raw_termios.cflag.PARENB = false;
-    self.raw_termios.cflag.CSIZE = .CS8;
-    self.raw_termios.cc[@intFromEnum(posix.system.V.TIME)] = 0;
-    self.raw_termios.cc[@intFromEnum(posix.system.V.MIN)] = 0;
-    try posix.tcsetattr(self.tty.handle, .FLUSH, self.raw_termios);
-}
+const Term = @import("Term.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -79,22 +18,18 @@ pub fn main() !void {
     };
 
     var term = try Term.init();
-    try term.uncook();
     defer term.deinit();
 
-    term.screen = try Screen.init(term.tty.writer(), allocator, try term.getSize());
+    const screen = term.screen(allocator);
+    defer screen.deinit();
 
     var sht = try Sheet.init(allocator, .{ 60, 100 });
     defer sht.deinit();
 
-    var renderer = SheetRenderer{ .screen = &term.screen };
+    var clipboard: ?String = null;
+    defer if (clipboard) |*cb| cb.deinit(allocator);
 
-    try posix.sigaction(posix.SIG.WINCH, &posix.Sigaction{
-        .handler = .{ .handler = handleSigWinch },
-        .mask = 0,
-        .flags = 0,
-    }, null);
-    var input = Input{ .reader = term.tty.reader() };
+    var renderer = SheetRenderer{ .screen = screen };
 
     const fps = 60;
     const npf: u64 = 1_000_000_000 / fps; // nanos per frame (more or less...)
@@ -108,15 +43,10 @@ pub fn main() !void {
         }
         then = now;
 
-        if (winch) {
-            try term.screen.resize(try term.getSize());
-            winch = false;
-        }
-
         try renderer.render(&sht);
-        try term.screen.flush();
+        try term.flush();
 
-        while (input.next() catch continue :outer) |key| {
+        while (term.input.next() catch continue :outer) |key| {
             if (sht.mode == .insert) {
                 if (key.codepoint == .escape) {
                     sht.commit();
@@ -138,20 +68,20 @@ pub fn main() !void {
                         sht.clearSelection();
                         sht.commit();
 
-                        if (term.clipboard) |*cb| {
+                        if (clipboard) |*cb| {
                             cb.deinit(allocator);
                         }
-                        term.clipboard = str;
+                        clipboard = str;
                     },
                     .y => {
                         const str = try sht.yank(allocator);
-                        if (term.clipboard) |*cb| {
+                        if (clipboard) |*cb| {
                             cb.deinit(allocator);
                         }
-                        term.clipboard = str;
+                        clipboard = str;
                     },
                     .p => {
-                        if (term.clipboard) |cb| {
+                        if (clipboard) |cb| {
                             var cell: *Cell = sht.currentCell();
                             cell.input.clearAndFree(sht.allocator);
                             try cell.input.appendSlice(sht.allocator, cb.bytes);
@@ -171,21 +101,6 @@ pub fn main() !void {
             }
         }
     }
-}
-
-var winch: bool = false;
-
-fn handleSigWinch(_: c_int) callconv(.C) void {
-    winch = true;
-}
-
-fn getSize(self: *const Term) !common.upos {
-    var size = std.mem.zeroes(posix.winsize);
-    const err = posix.system.ioctl(self.tty.handle, posix.T.IOCGWINSZ, @intFromPtr(&size));
-    if (posix.errno(err) != .SUCCESS) {
-        return posix.unexpectedErrno(@enumFromInt(err));
-    }
-    return .{ size.ws_row, size.ws_col };
 }
 
 // Next of the agenda:
