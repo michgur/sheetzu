@@ -52,7 +52,28 @@ fn parseSingleKey(self: *const Input) ParseError!Key {
     const bytes = self.buf[self.index..self.read_len];
 
     const cp_len = std.unicode.utf8ByteSequenceLength(bytes[0]) catch return ParseError.SeqParseError;
-    const cp = std.unicode.utf8Decode(bytes[0..cp_len]) catch return ParseError.SeqParseError;
+    const cp_int = std.unicode.utf8Decode(bytes[0..cp_len]) catch return ParseError.SeqParseError;
+    const cp: Key.Codepoint = @enumFromInt(cp_int);
 
-    return Key{ .codepoint = @enumFromInt(cp), .bytes = bytes[0..cp_len] };
+    if (cp == .escape and bytes.len > cp_len) return self.parseEscSeq(bytes);
+    return Key{ .codepoint = cp, .bytes = bytes[0..cp_len] };
+}
+
+fn parseEscSeq(self: *const Input, bytes: []const u8) ParseError!Key {
+    std.debug.assert(cpEq(bytes[0], .escape) and bytes.len > 1);
+    if (cpEq(bytes[1], .open_square_bracket)) return self.parseCSISeq(bytes);
+    return ParseError.SeqParseError;
+}
+
+fn parseCSISeq(_: *const Input, bytes: []const u8) ParseError!Key {
+    std.debug.assert(cpEq(bytes[0], .csi) or (cpEq(bytes[0], .escape) and cpEq(bytes[1], .open_square_bracket)));
+    // assume for now only the second option
+    return Key{
+        .codepoint = Key.fromCSI(bytes[2]),
+        .bytes = bytes[0..3],
+    };
+}
+
+inline fn cpEq(byte: u8, cp: Key.Codepoint) bool {
+    return byte == @intFromEnum(cp);
 }

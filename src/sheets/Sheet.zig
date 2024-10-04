@@ -89,6 +89,7 @@ pub fn clearSelection(self: *const Sheet) void {
     cl.dirty = true;
 }
 
+var cursorPos: usize = 0;
 pub fn onInput(self: *Sheet, input: Key) !void {
     var c: *Cell = self.currentCell();
     c.dirty = true;

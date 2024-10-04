@@ -56,10 +56,10 @@ pub fn main() !void {
                 }
             } else {
                 switch (key.codepoint) {
-                    .h => sht.current -|= .{ 0, 1 },
-                    .j => sht.current += .{ 1, 0 },
-                    .k => sht.current -|= .{ 1, 0 },
-                    .l => sht.current += .{ 0, 1 },
+                    .arrow_left, .h => sht.current -|= .{ 0, 1 },
+                    .arrow_down, .j => sht.current += .{ 1, 0 },
+                    .arrow_up, .k => sht.current -|= .{ 1, 0 },
+                    .arrow_right, .l => sht.current += .{ 0, 1 },
                     .i => {
                         sht.mode = .insert;
                     },

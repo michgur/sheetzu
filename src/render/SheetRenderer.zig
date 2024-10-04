@@ -49,7 +49,6 @@ fn renderCell(
     opts: RenderOptions,
 ) PenError!void {
     const EMPTY: u8 = '\x20';
-    const CURSOR = String.Codepoint.parseSingle("█");
 
     const content_width = content.displayWidth() + @intFromBool(opts.cursor);
     const left_padding = switch (opts.alignment) {
@@ -70,10 +69,7 @@ fn renderCell(
         try self.penNext(codepoint.info.display_width);
     }
     if (opts.cursor) {
-        var cursor_st = style;
-        cursor_st.bg = .blue;
-        cursor_st.bold = false;
-        self.put(CURSOR, cursor_st);
+        self.put(EMPTY, .{ .bg = .blue });
         try self.penNext(1);
     }
 

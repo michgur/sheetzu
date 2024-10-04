@@ -13,6 +13,7 @@ pub const Codepoint = enum(u21) {
     backspace = 0x7F,
     equal = 0x3D,
     multicodepoint = std.math.maxInt(u21),
+    open_square_bracket = 0x5b,
     a = 0x61,
     b = 0x62,
     c = 0x63,
@@ -39,5 +40,15 @@ pub const Codepoint = enum(u21) {
     x = 0x78,
     y = 0x79,
     z = 0x7a,
+    csi = 0x9b,
+    arrow_up,
+    arrow_down,
+    arrow_left,
+    arrow_right,
     _,
 };
+
+const CSI = [_]Codepoint{ .arrow_up, .arrow_down, .arrow_right, .arrow_left };
+pub fn fromCSI(value: u8) Codepoint {
+    return CSI[value - 'A'];
+}
