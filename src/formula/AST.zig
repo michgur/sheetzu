@@ -68,6 +68,13 @@ pub fn eval(self: *const AST, sht: *const Sheet) Value {
             },
         }
     }
+    if (self.value == .ref) {
+        if (sht.cell(self.value.ref)) |c| return c.value;
+        const msg_stack = "!REF";
+        const msg = sht.allocator.alloc(u8, msg_stack.len) catch unreachable;
+        @memcpy(msg, msg_stack);
+        return .{ .err = msg };
+    }
     return self.value;
 }
 
@@ -76,7 +83,6 @@ pub fn evalNumeral(self: *const AST, sht: *const Sheet) f64 {
 }
 
 pub fn deinit(self: *AST, allocator: std.mem.Allocator) void {
-    // future - are children heap allocated?
     self.value.deinit(allocator);
     for (self.children) |*child| {
         child.deinit(allocator);

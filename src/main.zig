@@ -25,6 +25,7 @@ pub fn init() !Term {
 
 pub fn deinit(self: *Term) void {
     self.screen.deinit();
+    if (self.clipboard) |*cb| cb.deinit(self.screen.allocator);
 
     self.cook() catch {};
     self.tty.close();
@@ -93,7 +94,6 @@ pub fn main() !void {
         .flags = 0,
     }, null);
     var input = Input{ .reader = term.tty.reader() };
-    var insert_mode = false;
 
     const fps = 60;
     const npf: u64 = 1_000_000_000 / fps; // nanos per frame (more or less...)
@@ -116,12 +116,10 @@ pub fn main() !void {
         try term.screen.flush();
 
         while (input.next() catch continue :outer) |key| {
-            if (insert_mode) {
+            if (sht.mode == .insert) {
                 if (key.codepoint == .escape) {
-                    if (insert_mode) {
-                        sht.tick();
-                        insert_mode = false;
-                    }
+                    sht.tick();
+                    sht.mode = .normal;
                 } else {
                     try sht.onInput(key);
                 }
@@ -132,7 +130,7 @@ pub fn main() !void {
                     .j => sht.current += .{ 1, 0 },
                     .k => sht.current -= .{ 1, 0 },
                     .i => {
-                        insert_mode = true;
+                        sht.mode = .insert;
                     },
                     .x => t: {
                         const str = try sht.currentCell().str.clone(allocator);

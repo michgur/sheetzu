@@ -3,12 +3,10 @@ const common = @import("../common.zig");
 const Style = @import("../render/Style.zig");
 const String = @import("../string/String.zig");
 const StringWriter = @import("../string/StringWriter.zig");
-const CellData = @import("data.zig").CellData;
 const AST = @import("../formula/AST.zig");
 const Sheet = @import("Sheet.zig");
 
 const Cell = @This();
-// data: CellData,
 
 style: Style,
 value: AST.Value,
@@ -44,7 +42,7 @@ pub fn deinit(self: *Cell, sht: *const Sheet) void {
     self.refers.deinit();
     self.str.deinit(sht.allocator);
     self.input.deinit();
-    self.ast.deinit(self.refers.allocator); // should prolly be unmanaged
+    self.ast.deinit(self.refers.allocator);
 }
 
 pub fn removeRefer(self: *Cell, refer: common.upos) bool {

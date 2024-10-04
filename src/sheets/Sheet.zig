@@ -22,6 +22,10 @@ header_style: Style = .{
 },
 rows: []usize,
 cols: []usize,
+mode: enum {
+    normal,
+    insert,
+} = .normal,
 
 const Error = error{ CircularDependency, OutOfBounds };
 
@@ -94,9 +98,9 @@ fn errorAST(allocator: std.mem.Allocator) AST {
 }
 
 pub fn tick(self: *Sheet) void {
-    var c = @constCast(self.currentCell());
+    var c: *Cell = @constCast(self.currentCell());
     if (c.dirty) {
-        var input = c.input.string() catch @panic("Out of memory");
+        var input = c.input.stringCopy(self.allocator) catch @panic("Out of memory");
         defer input.deinit(self.allocator);
         self.placeASTCurrent(
             Parser.parse(self.allocator, input.bytes) catch errorAST(self.allocator),
@@ -109,7 +113,6 @@ pub fn tick(self: *Sheet) void {
         };
         c.dirty = false;
     }
-    c.tick(self);
 }
 
 pub fn placeAST(self: *const Sheet, pos: common.upos, ast: AST) Error!void {

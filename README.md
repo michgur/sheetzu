@@ -3,6 +3,7 @@ sheets tui 🐶
 
 ## ideas (random order)
 - Next on the agenda: fix strings, make them immutable cause they're causing a mess
+- Same subject: consider removing this shizz altogether, just use byte arrays, so many fucking bugs
 ### UI
 - visual selection
 - command mode

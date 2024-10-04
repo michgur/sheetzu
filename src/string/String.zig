@@ -76,17 +76,6 @@ fn codepointCount(data: []const u8) usize {
     return count;
 }
 
-// pub fn append(self: *String, data: []const u8) !void {
-//     try self.bytes.appendSlice(data);
-//
-//     var s = data;
-//     while (s.len > 0) {
-//         const cp = CodepointInfo.parseSingle(s);
-//         try self.codepoints.append(cp);
-//         s = s[@max(1, cp.len)..];
-//     }
-// }
-
 fn byteIndexOf(self: *const String, i: usize) usize {
     var result: usize = 0;
     for (0..i) |j| {
@@ -95,41 +84,11 @@ fn byteIndexOf(self: *const String, i: usize) usize {
     return result;
 }
 
-// pub fn remove(self: *String, i: usize) void {
-//     const idx = self.byteIndexOf(i);
-//     const cplen = self.codepoints.orderedRemove(i).len;
-//     std.mem.copyForwards(u8, self.bytes[idx..], self.bytes[idx + cplen ..]);
-//     self.bytes.shrinkAndFree(self.bytes.len - cplen);
-// }
-
-// pub fn removeRange(self: *String, from: usize, to: usize) void {
-//     const start = self.byteIndexOf(from);
-//     const end = self.byteIndexOf(to) + self.codepoints[to].len;
-//     std.mem.copyForwards(u8, self.bytes[start..], self.bytes[end..]);
-//     self.bytes.shrinkAndFree(self.bytes.len + start - end);
-//     for (from..to + 1) |_| {
-//         _ = self.codepoints.orderedRemove(from);
-//     }
-// }
-
 pub fn deinit(self: *String, allocator: std.mem.Allocator) void {
     allocator.free(self.bytes);
     allocator.free(self.codepoints);
     self.* = undefined;
 }
-
-// pub fn replaceAll(self: *String, new_content: []const u8) !*String {
-//     self.bytes.clearRetainingCapacity();
-//     self.codepoints.clearRetainingCapacity();
-//     try self.append(new_content);
-//     if (self.bytes.capacity > self.bytes.len) {
-//         self.bytes.shrinkAndFree(self.bytes.len);
-//     }
-//     if (self.codepoints.capacity > self.codepoints.len) {
-//         self.codepoints.shrinkAndFree(self.codepoints.len);
-//     }
-//     return self;
-// }
 
 const Iterator = struct {
     str: *const String,
@@ -142,11 +101,12 @@ const Iterator = struct {
         }
 
         const info = self.str.codepoints[self.i];
+        const end = @min(self.off + info.len, self.str.bytes.len);
         defer {
             self.off += info.len;
             self.i += 1;
         }
-        return Codepoint.init(info, self.str.bytes[self.off .. self.off + info.len]);
+        return Codepoint.init(info, self.str.bytes[self.off..end]);
     }
 };
 

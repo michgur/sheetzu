@@ -30,8 +30,13 @@ pub fn deinit(self: *StringWriter) void {
 
 /// finish writing and create a new String. caller owns the memory.
 /// can be reused afterwards
-pub fn string(self: *StringWriter) Error!String {
-    return try String.init(self.allocator, try self.bytes.toOwnedSlice());
+pub fn string(self: *StringWriter, allocator: std.mem.Allocator) Error!String {
+    return try String.initOwn(allocator, try self.bytes.toOwnedSlice());
+}
+
+/// creates a copy of the content, caller owns it
+pub fn stringCopy(self: *const StringWriter, allocator: std.mem.Allocator) Error!String {
+    return try String.init(allocator, self.bytes.items);
 }
 
 pub fn clearAndFree(self: *StringWriter) void {

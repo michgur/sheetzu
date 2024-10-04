@@ -96,7 +96,7 @@ fn computeCellOffset(self: *SheetRenderer, sht: *const Sheet) void {
 }
 
 pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
-    var render_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var render_arena = std.heap.ArenaAllocator.init(sht.allocator); // carelessly allocate temporary strings for rendering
     defer render_arena.deinit();
     const allocator = render_arena.allocator();
     var str_writer = StringWriter.init(allocator);
@@ -110,8 +110,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
             common.bb26(@intCast(sht.current[1]), &buf),
             sht.current[0] + 1,
         });
-        var str = try str_writer.string();
-        defer str.deinit(allocator);
+        const str = try str_writer.string(allocator);
         self.renderCell(
             self.screen.size[1],
             str,
@@ -122,16 +121,14 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
     }
     { // render input
         const curr = sht.currentCell();
-        var str = if (curr.dirty) try String.init(allocator, curr.input.bytes.items) else curr.str;
-        defer if (curr.dirty) str.deinit(allocator);
+        const str = try curr.input.stringCopy(allocator);
         self.renderCell(self.screen.size[1], str, .{}, .left) catch {};
         self.penDown() catch return;
     }
 
     const row_header_w = std.math.log10(sht.cols.len) + 2;
     { // render sheetzu
-        var str = try String.init(allocator, "•ᴥ•");
-        defer str.deinit(allocator);
+        const str = try String.init(allocator, "•ᴥ•");
         self.renderCell(
             row_header_w,
             str,
@@ -142,9 +139,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
     { // render column headers
         for (sht.cols[offset[1]..], offset[1]..) |w, i| {
             const header = common.bb26(i, &buf);
-            var str = try String.init(allocator, header);
-            defer str.deinit(allocator);
-
+            const str = try String.init(allocator, header);
             var st = sht.header_style;
             if (i == sht.current[1]) st.reverse = true;
             self.renderCell(w, str, st, .center) catch break;
@@ -157,8 +152,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
 
         // row header
         try str_writer.writer().print("{d}\x20", .{r + 1});
-        var header = try str_writer.string();
-        defer header.deinit(allocator);
+        const header = try str_writer.string(allocator);
         var st = sht.header_style;
         if (r == sht.current[0]) st.reverse = true;
         self.renderCell(row_header_w, header, st, .right) catch continue;
@@ -167,8 +161,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
         for (sht.cols[offset[1]..], offset[1]..) |w, c| {
             const cell = sht.cell(.{ r, c }) orelse break;
             const is_current = r == sht.current[0] and c == sht.current[1];
-            var cellstr = if (cell.dirty) try String.init(allocator, cell.input.bytes.items) else cell.str;
-            defer if (cell.dirty) cellstr.deinit(allocator);
+            const cellstr = if (sht.mode == .insert and is_current) try cell.input.stringCopy(allocator) else cell.str;
             self.renderCell(
                 w,
                 cellstr,
