@@ -71,7 +71,8 @@ fn renderCell(
     }
     if (opts.cursor) {
         var cursor_st = style;
-        cursor_st.blinking = true;
+        cursor_st.bg = .blue;
+        cursor_st.bold = false;
         self.put(CURSOR, cursor_st);
         try self.penNext(1);
     }

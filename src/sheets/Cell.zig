@@ -1,3 +1,5 @@
+//! container for cell data. memory is owned by the containing Sheet.
+
 const std = @import("std");
 const common = @import("../common.zig");
 const Style = @import("../render/Style.zig");

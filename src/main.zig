@@ -102,9 +102,3 @@ pub fn main() !void {
         }
     }
 }
-
-// Next of the agenda:
-// - I did plenty of feature work, next comes refactor and cleanup
-// - Split terminal from main app
-// - input handler / ui state unit
-// - sheets - split to Sheet (mostly a container for cells) and formula engine (name pending) that handles the logic

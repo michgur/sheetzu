@@ -13,6 +13,7 @@ sheets tui 🐶
 - how should motions work? specifically long-text cells
     - this is not a text editor, maybe leave that part bare-bones
 ### Logic
+- formula engine with a dependency graph
 - functions
 - ranges
 - "drag" logic
