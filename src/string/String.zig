@@ -39,8 +39,8 @@ pub const Codepoint = struct {
     }
 };
 
-bytes: []const u8,
-codepoints: []const CodepointInfo,
+bytes: []const u8 = &.{},
+codepoints: []const CodepointInfo = &.{},
 
 pub const Error = std.mem.Allocator.Error || error{};
 

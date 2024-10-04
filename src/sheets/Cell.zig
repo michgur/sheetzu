@@ -4,40 +4,27 @@ const Style = @import("../render/Style.zig");
 const String = @import("../string/String.zig");
 const StringWriter = @import("../string/StringWriter.zig");
 const AST = @import("../formula/AST.zig");
-const Sheet = @import("Sheet.zig");
-const Parser = @import("../formula/Parser.zig");
 
 const Cell = @This();
 
-style: Style,
-value: AST.Value,
-str: String,
-input: StringWriter,
+style: Style = .{},
+value: AST.Value = .{ .blank = {} },
+str: String = .{},
+input: std.ArrayListUnmanaged(u8) = .{},
 dirty: bool = false,
-ast: AST,
-referrers: std.ArrayList(common.upos),
+ast: AST = .{},
+referrers: std.ArrayListUnmanaged(common.upos) = .{},
 
-pub fn init(allocator: std.mem.Allocator) Cell {
-    return .{
-        .ast = AST{},
-        .referrers = std.ArrayList(common.upos).init(allocator),
-        .value = .{ .blank = {} },
-        .str = String.init(allocator, "") catch unreachable,
-        .input = StringWriter.init(allocator),
-        .style = Style{},
-    };
+pub fn deinit(self: *Cell, allocator: std.mem.Allocator) void {
+    self.referrers.deinit(allocator);
+    self.str.deinit(allocator);
+    self.input.deinit(allocator);
+    self.ast.deinit(allocator);
 }
 
-pub fn deinit(self: *Cell, sht: *const Sheet) void {
-    self.referrers.deinit();
-    self.str.deinit(sht.allocator);
-    self.input.deinit();
-    self.ast.deinit(self.referrers.allocator);
-}
-
-pub fn removeReferrer(self: *Cell, refer: common.upos) bool {
+pub fn removeReferrer(self: *Cell, referrer: common.upos) bool {
     return for (self.referrers.items, 0..) |r, i| {
-        if (@reduce(.And, r == refer)) {
+        if (@reduce(.And, r == referrer)) {
             _ = self.referrers.swapRemove(i);
             break true;
         }

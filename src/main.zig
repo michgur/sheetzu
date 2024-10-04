@@ -2,6 +2,7 @@ const std = @import("std");
 const Input = @import("input/Input.zig");
 const SheetRenderer = @import("render/SheetRenderer.zig");
 const Sheet = @import("sheets/Sheet.zig");
+const Cell = @import("sheets/Cell.zig");
 const common = @import("common.zig");
 const Screen = @import("render/Screen.zig");
 const String = @import("string/String.zig");
@@ -133,8 +134,8 @@ pub fn main() !void {
                         sht.mode = .insert;
                     },
                     .x => {
-                        var cell = @constCast(sht.currentCell());
-                        cell.input.clearAndFree();
+                        var cell: *Cell = @constCast(sht.currentCell());
+                        cell.input.clearAndFree(sht.allocator);
                         const str = try cell.str.clone(allocator);
                         sht.commit();
 
@@ -152,9 +153,9 @@ pub fn main() !void {
                     },
                     .p => {
                         if (term.clipboard) |cb| {
-                            var cell = @constCast(sht.currentCell());
-                            cell.input.clearAndFree();
-                            try cell.input.writer().writeAll(cb.bytes);
+                            var cell: *Cell = @constCast(sht.currentCell());
+                            cell.input.clearAndFree(sht.allocator);
+                            try cell.input.appendSlice(sht.allocator, cb.bytes);
                             sht.commit();
                         }
                     },

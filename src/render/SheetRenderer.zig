@@ -121,7 +121,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
     }
     { // render input
         const curr = sht.currentCell();
-        const str = try curr.input.stringCopy(allocator);
+        const str = try String.init(allocator, curr.input.items);
         self.renderCell(self.screen.size[1], str, .{}, .left) catch {};
         self.penDown() catch return;
     }
@@ -161,7 +161,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
         for (sht.cols[offset[1]..], offset[1]..) |w, c| {
             const cell = sht.cell(.{ r, c }) orelse break;
             const is_current = r == sht.current[0] and c == sht.current[1];
-            const cellstr = if (sht.mode == .insert and is_current) try cell.input.stringCopy(allocator) else cell.str;
+            const cellstr = if (sht.mode == .insert and is_current) try String.init(allocator, cell.input.items) else cell.str;
             self.renderCell(
                 w,
                 cellstr,

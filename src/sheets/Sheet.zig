@@ -35,7 +35,7 @@ pub fn init(allocator: std.mem.Allocator, initial_size: common.upos) !Sheet {
         const row_slc = try allocator.alloc(*Cell, initial_size[1]);
         for (row_slc) |*c| {
             const cell_pt = try allocator.create(Cell);
-            cell_pt.* = Cell.init(allocator);
+            cell_pt.* = Cell{};
             c.* = cell_pt;
         }
         r.* = row_slc.ptr;
@@ -57,7 +57,7 @@ pub fn init(allocator: std.mem.Allocator, initial_size: common.upos) !Sheet {
 pub fn deinit(self: *Sheet) void {
     for (0..self.size[0]) |r| {
         for (0..self.size[1]) |c| {
-            self.cells[r][c].deinit(self);
+            self.cells[r][c].deinit(self.allocator);
             self.allocator.destroy(self.cells[r][c]);
         }
         self.allocator.free(self.cells[r][0..self.size[1]]);
@@ -87,9 +87,9 @@ pub fn onInput(self: *Sheet, input: Key) !void {
     var c: *Cell = @constCast(self.currentCell());
     c.dirty = true;
     if (input.codepoint == .backspace) {
-        _ = c.input.bytes.popOrNull();
+        _ = c.input.popOrNull();
     } else {
-        try c.input.writer().writeAll(input.bytes);
+        try c.input.appendSlice(self.allocator, input.bytes);
     }
 }
 
@@ -102,7 +102,7 @@ fn errorAST(allocator: std.mem.Allocator) AST {
 
 pub fn commit(self: *Sheet) void {
     var cl = self.varCurrCell();
-    var input = cl.input.stringCopy(self.allocator) catch @panic("Out of memory");
+    var input = String.init(self.allocator, cl.input.items) catch @panic("Out of memory");
     defer input.deinit(self.allocator);
 
     var ast = Parser.parse(self.allocator, input.bytes) catch errorAST(self.allocator);
@@ -157,7 +157,7 @@ fn isCircularRef(self: *const Sheet, pos: common.upos, ast: *const AST) bool {
 fn placeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
     if (ast.value == .ref) {
         if (self.varCell(ast.value.ref)) |c| {
-            c.referrers.append(pos) catch @panic("Out of memory");
+            c.referrers.append(self.allocator, pos) catch @panic("Out of memory");
         }
     }
     for (ast.children) |*child| {
