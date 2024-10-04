@@ -36,16 +36,23 @@ inline fn penReset(self: *SheetRenderer) void {
     self.pen = .{ 0, 0 };
 }
 
+const RenderOptions = struct {
+    alignment: enum { left, right, center } = .left,
+    cursor: bool = false,
+};
+
 fn renderCell(
     self: *SheetRenderer,
     width: usize,
     content: String,
     style: Style,
-    alignment: enum { left, right, center },
+    opts: RenderOptions,
 ) PenError!void {
     const EMPTY: u8 = '\x20';
-    const content_width = content.displayWidth();
-    const left_padding = switch (alignment) {
+    const CURSOR = String.Codepoint.parseSingle("█");
+
+    const content_width = content.displayWidth() + @intFromBool(opts.cursor);
+    const left_padding = switch (opts.alignment) {
         .left => 0,
         .center => (width -| content_width) / 2,
         .right => width -| content_width, // this seems wrong
@@ -61,6 +68,12 @@ fn renderCell(
     while (iter.next()) |codepoint| {
         self.put(codepoint, style);
         try self.penNext(codepoint.info.display_width);
+    }
+    if (opts.cursor) {
+        var cursor_st = style;
+        cursor_st.blinking = true;
+        self.put(CURSOR, cursor_st);
+        try self.penNext(1);
     }
 
     for (0..right_padding) |_| {
@@ -115,14 +128,14 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
             self.screen.size[1],
             str,
             .{ .fg = .green },
-            .left,
+            .{},
         ) catch {};
         self.penDown() catch return;
     }
     { // render input
         const curr = sht.currentCell();
         const str = try String.init(allocator, curr.input.items);
-        self.renderCell(self.screen.size[1], str, .{}, .left) catch {};
+        self.renderCell(self.screen.size[1], str, .{}, .{}) catch {};
         self.penDown() catch return;
     }
 
@@ -133,7 +146,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
             row_header_w,
             str,
             .{ .fg = .cyan },
-            .right,
+            .{ .alignment = .right },
         ) catch {};
     }
     { // render column headers
@@ -142,7 +155,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
             const str = try String.init(allocator, header);
             var st = sht.header_style;
             if (i == sht.current[1]) st.reverse = true;
-            self.renderCell(w, str, st, .center) catch break;
+            self.renderCell(w, str, st, .{ .alignment = .center }) catch break;
         }
     }
 
@@ -155,18 +168,19 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
         const header = try str_writer.string(allocator);
         var st = sht.header_style;
         if (r == sht.current[0]) st.reverse = true;
-        self.renderCell(row_header_w, header, st, .right) catch continue;
+        self.renderCell(row_header_w, header, st, .{ .alignment = .right }) catch continue;
 
         // row content
         for (sht.cols[offset[1]..], offset[1]..) |w, c| {
             const cell = sht.cell(.{ r, c }) orelse break;
             const is_current = r == sht.current[0] and c == sht.current[1];
-            const cellstr = if (sht.mode == .insert and is_current) try String.init(allocator, cell.input.items) else cell.str;
+            const is_current_insert = is_current and sht.mode == .insert;
+            const cellstr = if (is_current_insert) try String.init(allocator, cell.input.items) else cell.str;
             self.renderCell(
                 w,
                 cellstr,
-                if (is_current) sht.header_style else cell.style,
-                if (cell.value == .number) .right else .left,
+                if (is_current) st else cell.style,
+                .{ .alignment = if (cell.value == .number) .right else .left, .cursor = is_current_insert },
             ) catch break;
         }
     }

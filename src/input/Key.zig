@@ -11,6 +11,7 @@ pub const Codepoint = enum(u21) {
     escape = 0x1B,
     space = 0x20,
     backspace = 0x7F,
+    equal = 0x3D,
     multicodepoint = std.math.maxInt(u21),
     a = 0x61,
     b = 0x62,

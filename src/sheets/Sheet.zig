@@ -20,6 +20,10 @@ header_style: Style = .{
     .bg = .cyan,
     .bold = true,
 },
+cursor_style: Style = .{
+    .fg = .white,
+    .bg = .blue,
+},
 rows: []usize,
 cols: []usize,
 mode: enum {

@@ -158,6 +158,12 @@ pub fn main() !void {
                             sht.commit();
                         }
                     },
+                    .equal => {
+                        var cell: *Cell = sht.currentCell();
+                        cell.input.clearAndFree(sht.allocator);
+                        try cell.input.append(sht.allocator, '=');
+                        sht.mode = .insert;
+                    },
                     .q => break :outer,
                     else => {},
                 }
