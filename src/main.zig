@@ -134,9 +134,8 @@ pub fn main() !void {
                         sht.mode = .insert;
                     },
                     .x => {
-                        var cell: *Cell = @constCast(sht.currentCell());
-                        cell.input.clearAndFree(sht.allocator);
-                        const str = try cell.str.clone(allocator);
+                        const str = try sht.yank(allocator);
+                        sht.clearSelection();
                         sht.commit();
 
                         if (term.clipboard) |*cb| {
@@ -145,7 +144,7 @@ pub fn main() !void {
                         term.clipboard = str;
                     },
                     .y => {
-                        const str = try sht.currentCell().str.clone(allocator);
+                        const str = try sht.yank(allocator);
                         if (term.clipboard) |*cb| {
                             cb.deinit(allocator);
                         }
@@ -153,7 +152,7 @@ pub fn main() !void {
                     },
                     .p => {
                         if (term.clipboard) |cb| {
-                            var cell: *Cell = @constCast(sht.currentCell());
+                            var cell: *Cell = sht.currentCell();
                             cell.input.clearAndFree(sht.allocator);
                             try cell.input.appendSlice(sht.allocator, cb.bytes);
                             sht.commit();

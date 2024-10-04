@@ -42,6 +42,18 @@ pub const Value = union(enum) {
         };
     }
     var temp_buf: [1024]u8 = undefined;
+
+    pub fn clone(self: *const Value, allocator: std.mem.Allocator) !Value {
+        return switch (self.*) {
+            .string => |s| .{ .string = try s.clone(allocator) },
+            .err => |e| t: {
+                const new_e = try allocator.alloc(u8, e.len);
+                @memcpy(new_e, e);
+                break :t .{ .err = new_e };
+            },
+            else => self.*,
+        };
+    }
 };
 
 const Operator = enum { add, sub, mul, div };
@@ -69,7 +81,7 @@ pub fn eval(self: *const AST, sht: *const Sheet) Value {
         }
     }
     if (self.value == .ref) {
-        if (sht.cell(self.value.ref)) |c| return c.value;
+        if (sht.cell(self.value.ref)) |c| return c.value.clone(sht.allocator) catch unreachable;
         const msg_stack = "!REF";
         const msg = sht.allocator.alloc(u8, msg_stack.len) catch unreachable;
         @memcpy(msg, msg_stack);
@@ -89,26 +101,4 @@ pub fn deinit(self: *AST, allocator: std.mem.Allocator) void {
     }
     allocator.free(self.children);
     self.* = undefined;
-}
-
-pub fn allRefs(self: *const AST) []const common.upos {
-    const buf: [40]common.upos = undefined;
-    var i: usize = 0;
-    if (self.value == .ref) {
-        buf[0] = self.value.ref;
-        i = 1;
-    }
-    for (self.children) |child| {
-        const refs = child.allRefs();
-        for (refs) |r| {
-            for (buf, 0..i) |b, _| {
-                if (@reduce(.And, b == r)) break;
-            } else {
-                buf[i] = r;
-                i += 1;
-                if (i >= buf.len) @panic(std.fmt.comptimePrint("Oops, I thought {d} refs would be enough...", .{buf.len}));
-            }
-        }
-    }
-    return buf[0..i];
 }

@@ -62,29 +62,31 @@ pub fn deinit(self: *Sheet) void {
         }
         self.allocator.free(self.cells[r][0..self.size[1]]);
     }
+    self.allocator.free(self.cells[0..self.size[0]]);
     self.allocator.free(self.rows);
     self.allocator.free(self.cols);
-    self.allocator.free(self.cells[0..self.size[0]]);
     self.* = undefined;
 }
 
-inline fn varCurrCell(self: *const Sheet) *Cell {
-    return self.varCell(self.current) orelse unreachable;
+pub inline fn currentCell(self: *const Sheet) *Cell {
+    return self.cell(self.current) orelse unreachable;
 }
-fn varCell(self: *const Sheet, pos: common.upos) ?*Cell {
+pub fn cell(self: *const Sheet, pos: common.upos) ?*Cell {
     if (@reduce(.Or, pos >= self.size)) return null;
     return self.cells[pos[0]][pos[1]];
 }
-pub inline fn cell(self: *const Sheet, pos: common.upos) ?*const Cell {
-    return self.varCell(pos);
-}
 
-pub inline fn currentCell(self: *const Sheet) *const Cell {
-    return self.varCurrCell();
+pub fn yank(self: *const Sheet, allocator: std.mem.Allocator) !String {
+    return self.currentCell().str.clone(allocator);
+}
+pub fn clearSelection(self: *const Sheet) void {
+    var cl = self.currentCell();
+    cl.input.clearAndFree(self.allocator);
+    cl.dirty = true;
 }
 
 pub fn onInput(self: *Sheet, input: Key) !void {
-    var c: *Cell = @constCast(self.currentCell());
+    var c: *Cell = self.currentCell();
     c.dirty = true;
     if (input.codepoint == .backspace) {
         _ = c.input.popOrNull();
@@ -101,7 +103,7 @@ fn errorAST(allocator: std.mem.Allocator) AST {
 }
 
 pub fn commit(self: *Sheet) void {
-    var cl = self.varCurrCell();
+    var cl = self.currentCell();
     var input = String.init(self.allocator, cl.input.items) catch @panic("Out of memory");
     defer input.deinit(self.allocator);
 
@@ -118,7 +120,7 @@ pub fn commit(self: *Sheet) void {
 }
 
 pub fn tick(self: *Sheet, pos: common.upos) void {
-    var cl = self.varCell(pos) orelse return;
+    var cl = self.cell(pos) orelse return;
 
     cl.value.deinit(self.allocator);
     cl.str.deinit(self.allocator);
@@ -156,7 +158,7 @@ fn isCircularRef(self: *const Sheet, pos: common.upos, ast: *const AST) bool {
 
 fn placeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
     if (ast.value == .ref) {
-        if (self.varCell(ast.value.ref)) |c| {
+        if (self.cell(ast.value.ref)) |c| {
             c.referrers.append(self.allocator, pos) catch @panic("Out of memory");
         }
     }
@@ -168,7 +170,7 @@ fn placeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
 /// remove `pos` as a refer from all cells references by `ast`
 fn removeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
     if (ast.value == .ref) {
-        if (self.varCell(ast.value.ref)) |c| {
+        if (self.cell(ast.value.ref)) |c| {
             _ = c.removeReferrer(pos);
         }
     }

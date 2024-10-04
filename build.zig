@@ -11,6 +11,7 @@ pub fn build(b: *std.Build) void {
     };
     const exe = b.addExecutable(exe_opts);
     exe.addIncludePath(b.path("."));
+    exe.linkLibC();
 
     const install = b.addInstallArtifact(exe, .{});
     install.step.dependOn(&exe.step);
@@ -26,6 +27,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/tester.zig"),
     });
     unit_tests.addIncludePath(b.path("."));
+    unit_tests.linkLibC();
     const test_exe = b.addRunArtifact(unit_tests);
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&test_exe.step);
