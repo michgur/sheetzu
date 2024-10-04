@@ -102,3 +102,15 @@ pub fn deinit(self: *AST, allocator: std.mem.Allocator) void {
     allocator.free(self.children);
     self.* = undefined;
 }
+
+pub fn clone(self: *AST, allocator: std.mem.Allocator) !AST {
+    var result = AST{
+        .op = self.op,
+        .value = self.value.clone(allocator),
+        .children = try allocator.alloc(AST, self.children.len),
+    };
+    for (self.children, 0..) |child, i| {
+        result.children[i] = try child.clone(allocator);
+    }
+    return result;
+}

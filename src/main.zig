@@ -25,8 +25,8 @@ pub fn init() !Term {
 }
 
 pub fn deinit(self: *Term) void {
-    self.screen.deinit();
     if (self.clipboard) |*cb| cb.deinit(self.screen.allocator);
+    self.screen.deinit();
 
     self.cook() catch {};
     self.tty.close();

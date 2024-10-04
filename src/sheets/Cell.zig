@@ -20,6 +20,7 @@ pub fn deinit(self: *Cell, allocator: std.mem.Allocator) void {
     self.str.deinit(allocator);
     self.input.deinit(allocator);
     self.ast.deinit(allocator);
+    self.value.deinit(allocator);
 }
 
 pub fn removeReferrer(self: *Cell, referrer: common.upos) bool {
