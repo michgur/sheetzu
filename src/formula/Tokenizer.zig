@@ -40,6 +40,7 @@ fn readToken(self: *Tokenizer) Error!Token {
         '(' => return Token{ .bytes = self.input[0..1], .type = .open_paren },
         ')' => return Token{ .bytes = self.input[0..1], .type = .close_paren },
         ',' => return Token{ .bytes = self.input[0..1], .type = .comma },
+        '&' => return Token{ .bytes = self.input[0..1], .type = .ampersand },
         '0'...'9' => return self.readNumber(),
         'A'...'Z' => return self.readRef() catch self.readIdentifier(), // try ref, fallback to identifier
         'a'...'z' => return self.readIdentifier(), // identifier
@@ -104,8 +105,10 @@ fn readRef(self: *Tokenizer) Error!Token {
 
 fn readString(self: *Tokenizer) Error!Token {
     std.debug.assert(self.input[0] == '"');
-    for (self.input[1..], 0..) |c, i| {
-        if (c == '"') return Token{ .bytes = self.input[0 .. i + 1], .type = .string };
+    for (self.input[1..], 1..) |c, i| {
+        if (c == '"') {
+            return Token{ .bytes = self.input[0 .. i + 1], .type = .string };
+        }
     }
     return Error.InvalidSyntax; // unbalanced quotes
 }
@@ -126,6 +129,7 @@ pub const Token = struct {
         dash,
         asterisk,
         forward_slash,
+        ampersand,
         eof,
         ignore,
     };

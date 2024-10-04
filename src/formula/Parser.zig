@@ -1,19 +1,19 @@
-////////////////////////////////////////////////////////////
-// Grammar:                                               //
-////////////////////////////////////////////////////////////
-// <Formula>      ::= <Expression>                        //
-// <Expression>   ::= <Term> { ("+" | "-") <Term> }*      //
-// <Term>         ::= <Factor> { ("*" | "/") <Factor> }*  //
-// <Factor>       ::= "-" <Factor>                        //
-//                  | <Primary>                           //
-// <Primary>      ::= <number>                            //
-//                  | <string>                            //
-//                  | <ref>                               //
-//                  | "(" <Expression> ")"                //
-//                  | <FunctionCall>                      //
-// <FunctionCall> ::= <identifier> "(" <ArgumentList> ")" //
-// <ArgumentList> ::= <Expression> ("," <Expression>)*    //
-////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+// Grammar:                                                 //
+//////////////////////////////////////////////////////////////
+// <Formula>      ::= <Expression>                          //
+// <Expression>   ::= <Term> { ("+" | "-" | "&") <Term> }*  //
+// <Term>         ::= <Factor> { ("*" | "/") <Factor> }*    //
+// <Factor>       ::= "-" <Factor>                          //
+//                  | <Primary>                             //
+// <Primary>      ::= <number>                              //
+//                  | <string>                              //
+//                  | <ref>                                 //
+//                  | "(" <Expression> ")"                  //
+//                  | <FunctionCall>                        //
+// <FunctionCall> ::= <identifier> "(" <ArgumentList> ")"   //
+// <ArgumentList> ::= <Expression> ("," <Expression>)*      //
+//////////////////////////////////////////////////////////////
 
 const std = @import("std");
 const common = @import("../common.zig");
@@ -88,14 +88,19 @@ fn parseExpression(self: *Parser) Error!AST {
     while (true) {
         const token = try self.tokenizer.head;
         switch (token.type) {
-            .plus, .dash => |t| {
+            .plus, .dash, .ampersand => |t| {
                 self.tokenizer.consume();
                 const next_term = try self.parseTerm();
                 const children = try self.allocator.alloc(AST, 2);
                 children[0] = result;
                 children[1] = next_term;
                 result = AST{
-                    .op = if (t == .plus) .add else .sub,
+                    .op = switch (t) {
+                        .plus => .add,
+                        .dash => .sub,
+                        .ampersand => .concat,
+                        else => unreachable,
+                    },
                     .children = children,
                 };
             },
@@ -148,7 +153,7 @@ fn parseString(self: *Parser) Error!AST {
     defer self.tokenizer.consume();
     return AST{
         .value = .{
-            .string = try String.init(self.allocator, token.bytes),
+            .string = try String.init(self.allocator, token.bytes[1 .. token.bytes.len - 1]),
         },
     };
 }

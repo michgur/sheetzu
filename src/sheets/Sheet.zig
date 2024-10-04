@@ -120,6 +120,7 @@ pub fn commit(self: *Sheet) void {
     self.removeRefs(self.current, &cl.ast);
     self.placeRefs(self.current, &ast);
 
+    cl.ast.deinit(self.allocator);
     cl.ast = ast;
     self.tick(self.current);
 }

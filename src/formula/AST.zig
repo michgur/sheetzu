@@ -56,7 +56,7 @@ pub const Value = union(enum) {
     }
 };
 
-const Operator = enum { add, sub, mul, div };
+const Operator = enum { add, sub, mul, div, concat };
 
 op: ?Operator = null,
 value: Value = .{ .blank = {} },
@@ -78,6 +78,22 @@ pub fn eval(self: *const AST, sht: *const Sheet) Value {
             .div => return .{
                 .number = self.children[0].evalNumeral(sht) / self.children[1].evalNumeral(sht),
             },
+            .concat => {
+                var resa = self.children[0].eval(sht);
+                var resb = self.children[1].eval(sht);
+                defer resa.deinit(sht.allocator);
+                defer resb.deinit(sht.allocator);
+                var stra = resa.tostring(sht.allocator) catch @panic("OUOUO");
+                var strb = resb.tostring(sht.allocator) catch @panic("OUOUO");
+                defer stra.deinit(sht.allocator);
+                defer strb.deinit(sht.allocator);
+                const concat = sht.allocator.alloc(u8, stra.bytes.len + strb.bytes.len) catch @panic("OUEOFEJS");
+                @memcpy(concat[0..stra.bytes.len], stra.bytes);
+                @memcpy(concat[stra.bytes.len..], strb.bytes);
+                return .{
+                    .string = String.initOwn(sht.allocator, concat) catch @panic("alkhjfaeshf"),
+                };
+            },
         }
     }
     if (self.value == .ref) {
@@ -86,6 +102,10 @@ pub fn eval(self: *const AST, sht: *const Sheet) Value {
         const msg = sht.allocator.alloc(u8, msg_stack.len) catch unreachable;
         @memcpy(msg, msg_stack);
         return .{ .err = msg };
+    }
+    if (self.value == .string) {
+        const res = self.value.string.clone(sht.allocator) catch unreachable;
+        return .{ .string = res };
     }
     return self.value;
 }
