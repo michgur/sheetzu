@@ -23,7 +23,8 @@ pub const Codepoint = struct {
     bytes: [4]u8,
 
     pub fn init(info: CodepointInfo, bytes: []const u8) Codepoint {
-        std.debug.assert(bytes.len >= info.len and 4 >= info.len);
+        std.debug.assert(bytes.len >= info.len);
+        std.debug.assert(4 >= info.len);
 
         var b: [4]u8 = .{ 0, 0, 0, 0 };
         @memcpy(b[0..info.len], bytes[0..info.len]);
@@ -70,7 +71,7 @@ fn codepointCount(data: []const u8) usize {
     var count: usize = 0;
     var d = data;
     while (d.len > 0) : (count += 1) {
-        const len = @max(1, CodepointInfo.parseSingle(data).len);
+        const len = std.math.clamp(CodepointInfo.parseSingle(d).len, 1, d.len);
         d = d[len..];
     }
     return count;
@@ -101,7 +102,6 @@ const Iterator = struct {
         }
 
         const info = self.str.codepoints[self.i];
-        std.debug.print("len: {d}, ", .{info.len});
         const end = @min(self.off + info.len, self.str.bytes.len);
         defer {
             self.off += info.len;
