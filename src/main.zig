@@ -134,7 +134,7 @@ pub fn main() !void {
                     },
                     .x => t: {
                         const str = try sht.currentCell().str.clone(allocator);
-                        sht.setCurrentCell(try String.init(allocator, &.{})) catch break :t;
+                        sht.setCurrentCell(try String.init(allocator, "")) catch break :t;
 
                         if (term.clipboard) |*cb| {
                             cb.deinit(allocator);
@@ -150,7 +150,7 @@ pub fn main() !void {
                     },
                     .p => {
                         if (term.clipboard) |cb| {
-                            try sht.setCurrentCell(try cb.clone(allocator));
+                            try sht.setCurrentCell(cb);
                         }
                     },
                     .q => break :outer,

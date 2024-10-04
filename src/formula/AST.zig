@@ -34,7 +34,7 @@ pub const Value = union(enum) {
 
     pub fn tostring(self: *const Value, allocator: std.mem.Allocator) !String {
         return switch (self.*) {
-            .string => |s| s,
+            .string => |s| try s.clone(allocator),
             .number => |n| try String.init(allocator, std.fmt.bufPrint(&temp_buf, "{d}", .{n}) catch "!ERR"),
             .blank => try String.init(allocator, ""),
             .err => |e| try String.init(allocator, e),

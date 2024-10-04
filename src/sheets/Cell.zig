@@ -29,7 +29,7 @@ pub fn init(allocator: std.mem.Allocator) Cell {
 
 pub fn tick(self: *Cell, sht: *const Sheet) void {
     self.value = self.ast.eval(sht);
-    const str = self.value.tostring(sht.allocator) catch unreachable;
+    const str = self.value.tostring(sht.allocator) catch @panic("Failed to convert value to string - am I stupid?");
     self.str.deinit(sht.allocator);
     self.str = str;
 
