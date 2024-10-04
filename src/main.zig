@@ -118,23 +118,25 @@ pub fn main() !void {
         while (input.next() catch continue :outer) |key| {
             if (sht.mode == .insert) {
                 if (key.codepoint == .escape) {
-                    sht.tick();
+                    sht.commit();
                     sht.mode = .normal;
                 } else {
                     try sht.onInput(key);
                 }
             } else {
                 switch (key.codepoint) {
-                    .h => sht.current -= .{ 0, 1 },
+                    .h => sht.current -|= .{ 0, 1 },
                     .l => sht.current += .{ 0, 1 },
                     .j => sht.current += .{ 1, 0 },
-                    .k => sht.current -= .{ 1, 0 },
+                    .k => sht.current -|= .{ 1, 0 },
                     .i => {
                         sht.mode = .insert;
                     },
-                    .x => t: {
-                        const str = try sht.currentCell().str.clone(allocator);
-                        sht.setCurrentCell(try String.init(allocator, "")) catch break :t;
+                    .x => {
+                        var cell = @constCast(sht.currentCell());
+                        cell.input.clearAndFree();
+                        const str = try cell.str.clone(allocator);
+                        sht.commit();
 
                         if (term.clipboard) |*cb| {
                             cb.deinit(allocator);
@@ -150,14 +152,16 @@ pub fn main() !void {
                     },
                     .p => {
                         if (term.clipboard) |cb| {
-                            try sht.setCurrentCell(cb);
+                            var cell = @constCast(sht.currentCell());
+                            cell.input.clearAndFree();
+                            try cell.input.writer().writeAll(cb.bytes);
+                            sht.commit();
                         }
                     },
                     .q => break :outer,
                     else => {},
                 }
-                sht.current = @max(sht.current, common.ipos{ 0, 0 });
-                sht.current = @min(sht.current, common.ipos{ @intCast(sht.rows.len - 1), @intCast(sht.cols.len - 1) });
+                sht.current = @min(sht.current, common.upos{ sht.rows.len - 1, sht.cols.len - 1 });
             }
         }
     }

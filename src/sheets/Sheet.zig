@@ -14,7 +14,7 @@ allocator: std.mem.Allocator,
 cells: [*][*]*Cell,
 size: common.upos,
 
-current: common.ipos = .{ 0, 0 },
+current: common.upos = .{ 0, 0 },
 header_style: Style = .{
     .fg = .black,
     .bg = .cyan,
@@ -68,16 +68,19 @@ pub fn deinit(self: *Sheet) void {
     self.* = undefined;
 }
 
-fn varcell(self: *const Sheet, pos: common.upos) ?*Cell {
+inline fn varCurrCell(self: *const Sheet) *Cell {
+    return self.varCell(self.current) orelse unreachable;
+}
+fn varCell(self: *const Sheet, pos: common.upos) ?*Cell {
     if (@reduce(.Or, pos >= self.size)) return null;
     return self.cells[pos[0]][pos[1]];
 }
 pub inline fn cell(self: *const Sheet, pos: common.upos) ?*const Cell {
-    return self.varcell(pos);
+    return self.varCell(pos);
 }
 
 pub inline fn currentCell(self: *const Sheet) *const Cell {
-    return self.cell(common.posCast(self.current)) orelse unreachable;
+    return self.varCurrCell();
 }
 
 pub fn onInput(self: *Sheet, input: Key) !void {
@@ -97,56 +100,44 @@ fn errorAST(allocator: std.mem.Allocator) AST {
     return AST{ .value = .{ .err = msg } };
 }
 
-pub fn tick(self: *Sheet) void {
-    var c: *Cell = @constCast(self.currentCell());
-    if (c.dirty) {
-        var input = c.input.stringCopy(self.allocator) catch @panic("Out of memory");
-        defer input.deinit(self.allocator);
-        self.placeASTCurrent(
-            Parser.parse(self.allocator, input.bytes) catch errorAST(self.allocator),
-        ) catch |err| {
-            if (err == std.mem.Allocator.Error.OutOfMemory) {
-                @panic("Out of memory");
-            } else {
-                self.placeASTCurrent(errorAST(self.allocator)) catch @panic("Out of memory");
-            }
-        };
-        c.dirty = false;
+pub fn commit(self: *Sheet) void {
+    var cl = self.varCurrCell();
+    var input = cl.input.stringCopy(self.allocator) catch @panic("Out of memory");
+    defer input.deinit(self.allocator);
+
+    var ast = Parser.parse(self.allocator, input.bytes) catch errorAST(self.allocator);
+    if (self.isCircularRef(self.current, &ast)) {
+        ast.deinit(self.allocator);
+        ast = errorAST(self.allocator);
     }
+    self.removeRefs(self.current, &cl.ast);
+    self.placeRefs(self.current, &ast);
+
+    cl.ast = ast;
+    self.tick(self.current);
 }
 
-pub fn placeAST(self: *const Sheet, pos: common.upos, ast: AST) Error!void {
-    var c: *Cell = @constCast(self.cell(pos)) orelse return Error.OutOfBounds;
-    if (isCircularRef(self, pos, &ast)) return Error.CircularDependency;
-    self.removeRefs(pos, &c.ast);
-    self.placeRefs(pos, &ast);
-    c.ast.deinit(self.allocator);
-    c.ast = ast;
-    c.tick(self);
-    self.cols[pos[1]] = @max(self.cols[pos[1]], c.str.displayWidth());
-}
+pub fn tick(self: *Sheet, pos: common.upos) void {
+    var cl = self.varCell(pos) orelse return;
 
-pub inline fn placeASTCurrent(self: *const Sheet, ast: AST) Error!void {
-    try self.placeAST(common.posCast(self.current), ast);
-}
+    cl.value.deinit(self.allocator);
+    cl.str.deinit(self.allocator);
 
-pub fn setCell(self: *const Sheet, pos: common.upos, content: String) (Error || Parser.Error)!void {
-    var c = self.varcell(pos) orelse return Error.OutOfBounds;
-    c.input.clearAndFree();
-    try c.input.writer().writeAll(content.bytes);
-    const ast = try Parser.parse(self.allocator, content.bytes);
-    try self.placeAST(pos, ast);
-}
+    cl.value = cl.ast.eval(self);
+    cl.str = cl.value.tostring(self.allocator) catch @panic("Why??");
 
-pub fn setCurrentCell(self: *const Sheet, content: String) (Error || Parser.Error)!void {
-    try self.setCell(common.posCast(self.current), content);
+    for (cl.referrers.items) |refer| {
+        self.tick(refer);
+    }
+
+    self.cols[pos[1]] = @max(self.cols[pos[1]], cl.str.displayWidth());
 }
 
 /// whether `this` depends on `upon`. `upon` is out of bounds, returns false
 pub fn dependsOn(self: *const Sheet, this: common.upos, upon: common.upos) bool {
     const upon_cell = self.cell(upon) orelse return false;
     if (@reduce(.And, this == upon)) return true;
-    return for (upon_cell.refers.items) |refer| {
+    return for (upon_cell.referrers.items) |refer| {
         if (@reduce(.And, this == refer)) break true;
     } else false;
 }
@@ -165,8 +156,8 @@ fn isCircularRef(self: *const Sheet, pos: common.upos, ast: *const AST) bool {
 
 fn placeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
     if (ast.value == .ref) {
-        if (self.varcell(ast.value.ref)) |c| {
-            c.refers.append(pos) catch @panic("Out of memory");
+        if (self.varCell(ast.value.ref)) |c| {
+            c.referrers.append(pos) catch @panic("Out of memory");
         }
     }
     for (ast.children) |*child| {
@@ -177,8 +168,8 @@ fn placeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
 /// remove `pos` as a refer from all cells references by `ast`
 fn removeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
     if (ast.value == .ref) {
-        if (self.varcell(ast.value.ref)) |c| {
-            _ = c.removeRefer(pos);
+        if (self.varCell(ast.value.ref)) |c| {
+            _ = c.removeReferrer(pos);
         }
     }
     for (ast.children) |*child| {

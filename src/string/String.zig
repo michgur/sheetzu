@@ -101,6 +101,7 @@ const Iterator = struct {
         }
 
         const info = self.str.codepoints[self.i];
+        std.debug.print("len: {d}, ", .{info.len});
         const end = @min(self.off + info.len, self.str.bytes.len);
         defer {
             self.off += info.len;
