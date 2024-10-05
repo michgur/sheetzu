@@ -82,11 +82,11 @@ fn renderCell(
 
 const scrolloff: usize = 1;
 var offset: common.upos = .{ 0, 0 };
-fn computeCellOffset(self: *SheetRenderer, sht: *const Sheet) void {
+fn computeCellOffset(self: *SheetRenderer, sht: *const Sheet, state: *const InputHandler) void {
     const sizes = [2][]usize{ sht.rows, sht.cols };
     const paddings = [2]usize{ 2, 0 };
     for (0..2) |d| {
-        const curr: usize = @intCast(sht.current[d]);
+        const curr: usize = @intCast(state.current[d]);
         const start = curr + 1 -| scrolloff;
         const end = @min(sizes[d].len, curr + scrolloff);
         if (start < offset[d]) {
@@ -114,12 +114,12 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet, state: *const InputHandle
     var buf: [32]u8 = undefined; // for string operations
 
     self.penReset();
-    self.computeCellOffset(sht);
+    self.computeCellOffset(sht, state);
 
     { // render current ref
         try str_writer.writer().print("{s}{d}", .{
-            common.bb26(@intCast(sht.current[1]), &buf),
-            sht.current[0] + 1,
+            common.bb26(@intCast(state.current[1]), &buf),
+            state.current[0] + 1,
         });
         const str = try str_writer.string(allocator);
         self.renderCell(
@@ -131,7 +131,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet, state: *const InputHandle
         self.penDown() catch return;
     }
     { // render input
-        const curr = sht.currentCell();
+        const curr = state.currentCell();
         const str = try String.init(allocator, curr.input.items);
         self.renderCell(self.screen.size[1], str, .{}, .{}) catch {};
         self.penDown() catch return;
@@ -152,7 +152,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet, state: *const InputHandle
             const header = common.bb26(i, &buf);
             const str = try String.init(allocator, header);
             var st = sht.header_style;
-            if (i == sht.current[1]) st.reverse = true;
+            if (i == state.current[1]) st.reverse = true;
             self.renderCell(w, str, st, .{ .alignment = .center }) catch break;
         }
     }
@@ -165,13 +165,13 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet, state: *const InputHandle
         try str_writer.writer().print("{d}\x20", .{r + 1});
         const header = try str_writer.string(allocator);
         var st = sht.header_style;
-        if (r == sht.current[0]) st.reverse = true;
+        if (r == state.current[0]) st.reverse = true;
         self.renderCell(row_header_w, header, st, .{ .alignment = .right }) catch continue;
 
         // row content
         for (sht.cols[offset[1]..], offset[1]..) |w, c| {
             const cell = sht.cell(.{ r, c }) orelse break;
-            const is_current = r == sht.current[0] and c == sht.current[1];
+            const is_current = r == state.current[0] and c == state.current[1];
             const is_current_insert = is_current and state.mode == .insert;
             const cellstr = if (is_current_insert) try String.init(allocator, cell.input.items) else cell.str;
             self.renderCell(

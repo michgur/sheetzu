@@ -14,7 +14,6 @@ allocator: std.mem.Allocator,
 cells: [*][*]*Cell,
 size: common.upos,
 
-current: common.upos = .{ 0, 0 },
 header_style: Style = .{
     .fg = .black,
     .bg = .cyan,
@@ -68,21 +67,9 @@ pub fn deinit(self: *Sheet) void {
     self.* = undefined;
 }
 
-pub inline fn currentCell(self: *const Sheet) *Cell {
-    return self.cell(self.current) orelse unreachable;
-}
 pub fn cell(self: *const Sheet, pos: common.upos) ?*Cell {
     if (@reduce(.Or, pos >= self.size)) return null;
     return self.cells[pos[0]][pos[1]];
-}
-
-pub fn yank(self: *const Sheet, allocator: std.mem.Allocator) !String {
-    return self.currentCell().str.clone(allocator);
-}
-pub fn clearSelection(self: *const Sheet) void {
-    var cl = self.currentCell();
-    cl.input.clearAndFree(self.allocator);
-    cl.dirty = true;
 }
 
 fn errorAST(allocator: std.mem.Allocator) AST {
@@ -92,22 +79,29 @@ fn errorAST(allocator: std.mem.Allocator) AST {
     return AST{ .value = .{ .err = msg } };
 }
 
-pub fn commit(self: *Sheet) void {
-    var cl = self.currentCell();
+pub fn clearAndCommit(self: *Sheet, pos: common.upos) ?void {
+    var cl = self.cell(pos) orelse return null;
+    cl.input.clearAndFree(self.allocator);
+    cl.dirty = true;
+    self.commit(pos) orelse unreachable;
+}
+
+pub fn commit(self: *Sheet, pos: common.upos) ?void {
+    var cl = self.cell(pos) orelse return null;
     var input = String.init(self.allocator, cl.input.items) catch @panic("Out of memory");
     defer input.deinit(self.allocator);
 
     var ast = Parser.parse(self.allocator, input.bytes) catch errorAST(self.allocator);
-    if (self.isCircularRef(self.current, &ast)) {
+    if (self.isCircularRef(pos, &ast)) {
         ast.deinit(self.allocator);
         ast = errorAST(self.allocator);
     }
-    self.removeRefs(self.current, &cl.ast);
-    self.placeRefs(self.current, &ast);
+    self.removeRefs(pos, &cl.ast);
+    self.placeRefs(pos, &ast);
 
     cl.ast.deinit(self.allocator);
     cl.ast = ast;
-    self.tick(self.current);
+    self.tick(pos);
 }
 
 pub fn tick(self: *Sheet, pos: common.upos) void {
