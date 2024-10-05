@@ -112,6 +112,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet, state: *const InputHandle
     const allocator = render_arena.allocator();
     var str_writer = StringWriter.init(allocator);
     var buf: [32]u8 = undefined; // for string operations
+    const current_cell_preview = try String.init(allocator, state.currentCellPreview(allocator));
 
     self.penReset();
     self.computeCellOffset(sht, state);
@@ -131,9 +132,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet, state: *const InputHandle
         self.penDown() catch return;
     }
     { // render input
-        const curr = state.currentCell();
-        const str = try String.init(allocator, curr.input.items);
-        self.renderCell(self.screen.size[1], str, .{}, .{}) catch {};
+        self.renderCell(self.screen.size[1], current_cell_preview, .{}, .{}) catch {};
         self.penDown() catch return;
     }
 
@@ -168,17 +167,19 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet, state: *const InputHandle
         if (r == state.current[0]) st.reverse = true;
         self.renderCell(row_header_w, header, st, .{ .alignment = .right }) catch continue;
 
+        const formula_ref = if (state.formula) |f| if (f.ref) |ref| ref else null else null;
         // row content
         for (sht.cols[offset[1]..], offset[1]..) |w, c| {
             const cell = sht.cell(.{ r, c }) orelse break;
             const is_current = r == state.current[0] and c == state.current[1];
             const is_current_insert = is_current and state.mode == .insert;
-            const cellstr = if (is_current_insert) try String.init(allocator, cell.input.items) else cell.str;
+            const is_formula_ref = if (formula_ref) |ref| ref[0] == r and ref[1] == c else false;
+            const cellstr = if (is_current_insert) current_cell_preview else cell.str;
             self.renderCell(
                 w,
                 cellstr,
-                if (is_current) st else cell.style,
-                .{ .alignment = if (cell.value == .number) .right else .left, .cursor = is_current_insert },
+                if (is_current) st else if (is_formula_ref) .{ .fg = .black, .bg = .magenta } else cell.style,
+                .{ .alignment = if (cell.value == .number and !is_current_insert) .right else .left, .cursor = is_current_insert },
             ) catch break;
         }
     }

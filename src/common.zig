@@ -12,7 +12,7 @@ pub const Rect = struct {
 pub inline fn posCast(pos: anytype) switch (@TypeOf(pos)) {
     ipos => upos,
     upos => ipos,
-    else => |T| @compileError(std.fmt.comptimePrint("Unsupported type for posCast - {n}\n", .{@typeName(T)})),
+    else => |T| @compileError(std.fmt.comptimePrint("Unsupported type for posCast - {s}\n", .{@typeName(T)})),
 } {
     return switch (@TypeOf(pos)) {
         ipos => upos{ @intCast(pos[0]), @intCast(pos[1]) },
