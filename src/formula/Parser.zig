@@ -20,6 +20,7 @@ const common = @import("../common.zig");
 const Tokenizer = @import("Tokenizer.zig");
 const AST = @import("AST.zig");
 const String = @import("../string/String.zig");
+const functions = @import("functions.zig").functions;
 const Parser = @This();
 
 tokenizer: Tokenizer,
@@ -60,7 +61,7 @@ fn parseFormula(self: *Parser) Error!AST {
 fn parsePrimary(self: *Parser) Error!AST {
     const token = try self.tokenizer.head;
     switch (token.type) {
-        // .identifier => return self.parseFunctionCall(token),
+        .identifier => return self.parseFunctionCall(),
         .string => return self.parseString(),
         .number => return self.parseNumber(),
         .open_paren => {
@@ -77,9 +78,49 @@ fn parsePrimary(self: *Parser) Error!AST {
     }
 }
 
-// fn parseFunctionCall(self: *Parser, token: Tokenizer.Token) Error!AST {
-//     if (token.type != .open_paren) return Error.ParsingError;
-// }
+fn parseFunctionCall(self: *Parser) Error!AST {
+    const fname = try self.tokenizer.head;
+    std.debug.assert(fname.type == .identifier);
+    self.tokenizer.consume();
+    const open_paren = try self.tokenizer.head;
+    if (open_paren.type != .open_paren) {
+        return Error.ParsingError;
+    }
+    self.tokenizer.consume();
+
+    const f = functions.get(fname.bytes) orelse return Error.ParsingError;
+    var args = try self.parseArgumentList();
+    errdefer args.deinit(self.allocator);
+    args.op = .{ .FN = f };
+
+    const close_paren = try self.tokenizer.head;
+    if (close_paren.type != .close_paren) {
+        std.debug.print("token is {any}\n", .{self.tokenizer.head});
+        return Error.ParsingError;
+    }
+    self.tokenizer.consume();
+
+    return args;
+}
+
+fn parseArgumentList(self: *Parser) Error!AST {
+    var children = std.ArrayList(AST).init(self.allocator);
+    errdefer children.deinit();
+    try children.append(try self.parseExpression());
+
+    while (true) {
+        const token = try self.tokenizer.head;
+        switch (token.type) {
+            .close_paren => break,
+            .comma => self.tokenizer.consume(),
+            else => return Error.ParsingError,
+        }
+
+        try children.append(try self.parseExpression());
+    }
+
+    return AST{ .children = try children.toOwnedSlice() };
+}
 
 fn parseExpression(self: *Parser) Error!AST {
     var result = try self.parseTerm();
@@ -90,17 +131,19 @@ fn parseExpression(self: *Parser) Error!AST {
         switch (token.type) {
             .plus, .dash, .ampersand => |t| {
                 self.tokenizer.consume();
-                const next_term = try self.parseTerm();
+                var next_term = try self.parseTerm();
+                errdefer next_term.deinit(self.allocator);
+
                 const children = try self.allocator.alloc(AST, 2);
                 children[0] = result;
                 children[1] = next_term;
                 result = AST{
-                    .op = switch (t) {
+                    .op = .{ .OP = switch (t) {
                         .plus => .add,
                         .dash => .sub,
                         .ampersand => .concat,
                         else => unreachable,
-                    },
+                    } },
                     .children = children,
                 };
             },
@@ -118,12 +161,14 @@ fn parseTerm(self: *Parser) Error!AST {
         switch (next_token.type) {
             .asterisk, .forward_slash => |t| {
                 self.tokenizer.consume();
-                const next_factor = try self.parseFactor();
+                var next_factor = try self.parseFactor();
+                errdefer next_factor.deinit(self.allocator);
+
                 const children = try self.allocator.alloc(AST, 2);
                 children[0] = result;
                 children[1] = next_factor;
                 result = AST{
-                    .op = if (t == .asterisk) .mul else .div,
+                    .op = .{ .OP = if (t == .asterisk) .mul else .div },
                     .children = children,
                 };
             },
