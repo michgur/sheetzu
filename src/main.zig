@@ -43,7 +43,7 @@ pub fn main() !void {
     const npf: u64 = 1_000_000_000 / fps; // nanos per frame (more or less...)
 
     var then = std.time.nanoTimestamp();
-    outer: while (true) {
+    while (true) {
         const now = std.time.nanoTimestamp();
         const dt: u64 = @intCast(@as(i64, @truncate(now - then)));
         if (dt < npf) {
@@ -54,7 +54,7 @@ pub fn main() !void {
         try renderer.render(&sht, &input_handler);
         try term.flush();
         input_handler.tick() catch |err| {
-            if (err == InputHandler.Error.Quit) break :outer;
+            if (err == InputHandler.Error.Quit) break;
             return err;
         };
     }
