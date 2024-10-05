@@ -8,9 +8,13 @@ const InputHandler = @This();
 
 input: *Input,
 sheet: *Sheet,
+allocator: std.mem.Allocator,
 
 clipboard: ?String = null,
-allocator: std.mem.Allocator,
+mode: enum {
+    normal,
+    insert,
+} = .normal,
 
 pub fn deinit(self: *InputHandler) void {
     if (self.clipboard) |*cb| cb.deinit(self.allocator);
@@ -21,12 +25,12 @@ pub const Error = error{Quit};
 
 pub fn tick(self: *InputHandler) !void {
     while (self.input.next() catch return) |key| {
-        if (self.sheet.mode == .insert) {
+        if (self.mode == .insert) {
             if (key.codepoint == .escape) {
                 self.sheet.commit();
-                self.sheet.mode = .normal;
+                self.mode = .normal;
             } else {
-                try self.sheet.onInput(key);
+                try self.onInput(key);
             }
         } else switch (key.codepoint) {
             .arrow_left, .h => self.sheet.current -|= .{ 0, 1 },
@@ -34,7 +38,7 @@ pub fn tick(self: *InputHandler) !void {
             .arrow_up, .k => self.sheet.current -|= .{ 1, 0 },
             .arrow_right, .l => self.sheet.current += .{ 0, 1 },
             .i => {
-                self.sheet.mode = .insert;
+                self.mode = .insert;
             },
             .x => {
                 const str = try self.sheet.yank(self.allocator);
@@ -65,10 +69,20 @@ pub fn tick(self: *InputHandler) !void {
                 var cell: *Cell = self.sheet.currentCell();
                 cell.input.clearAndFree(self.sheet.allocator);
                 try cell.input.append(self.sheet.allocator, '=');
-                self.sheet.mode = .insert;
+                self.mode = .insert;
             },
             .q => return Error.Quit,
             else => {},
         }
+    }
+}
+
+pub fn onInput(self: *InputHandler, input: Key) !void {
+    var c: *Cell = self.sheet.currentCell();
+    c.dirty = true;
+    if (input.codepoint == .backspace) {
+        _ = c.input.popOrNull();
+    } else {
+        try c.input.appendSlice(self.allocator, input.bytes);
     }
 }

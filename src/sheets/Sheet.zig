@@ -26,10 +26,6 @@ cursor_style: Style = .{
 },
 rows: []usize,
 cols: []usize,
-mode: enum {
-    normal,
-    insert,
-} = .normal,
 
 const Error = error{ CircularDependency, OutOfBounds };
 
@@ -87,17 +83,6 @@ pub fn clearSelection(self: *const Sheet) void {
     var cl = self.currentCell();
     cl.input.clearAndFree(self.allocator);
     cl.dirty = true;
-}
-
-var cursorPos: usize = 0;
-pub fn onInput(self: *Sheet, input: Key) !void {
-    var c: *Cell = self.currentCell();
-    c.dirty = true;
-    if (input.codepoint == .backspace) {
-        _ = c.input.popOrNull();
-    } else {
-        try c.input.appendSlice(self.allocator, input.bytes);
-    }
 }
 
 fn errorAST(allocator: std.mem.Allocator) AST {

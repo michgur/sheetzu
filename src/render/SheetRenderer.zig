@@ -5,6 +5,7 @@ const Sheet = @import("../sheets/Sheet.zig");
 const Style = @import("Style.zig");
 const String = @import("../string/String.zig");
 const StringWriter = @import("../string/StringWriter.zig");
+const InputHandler = @import("../InputHandler.zig");
 
 const SheetRenderer = @This();
 
@@ -105,7 +106,7 @@ fn computeCellOffset(self: *SheetRenderer, sht: *const Sheet) void {
     }
 }
 
-pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
+pub fn render(self: *SheetRenderer, sht: *const Sheet, state: *const InputHandler) !void {
     var render_arena = std.heap.ArenaAllocator.init(sht.allocator); // carelessly allocate temporary strings for rendering
     defer render_arena.deinit();
     const allocator = render_arena.allocator();
@@ -171,7 +172,7 @@ pub fn render(self: *SheetRenderer, sht: *const Sheet) !void {
         for (sht.cols[offset[1]..], offset[1]..) |w, c| {
             const cell = sht.cell(.{ r, c }) orelse break;
             const is_current = r == sht.current[0] and c == sht.current[1];
-            const is_current_insert = is_current and sht.mode == .insert;
+            const is_current_insert = is_current and state.mode == .insert;
             const cellstr = if (is_current_insert) try String.init(allocator, cell.input.items) else cell.str;
             self.renderCell(
                 w,

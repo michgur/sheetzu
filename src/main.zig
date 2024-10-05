@@ -51,7 +51,7 @@ pub fn main() !void {
         }
         then = now;
 
-        try renderer.render(&sht);
+        try renderer.render(&sht, &input_handler);
         try term.flush();
         input_handler.tick() catch |err| {
             if (err == InputHandler.Error.Quit) break :outer;
