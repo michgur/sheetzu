@@ -6,6 +6,7 @@ const Screen = @import("render/Screen.zig");
 const common = @import("common.zig");
 const String = @import("string/String.zig");
 const Term = @import("Term.zig");
+const InputHandler = @import("InputHandler.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -31,6 +32,13 @@ pub fn main() !void {
 
     var renderer = SheetRenderer{ .screen = screen };
 
+    var input_handler = InputHandler{
+        .allocator = allocator,
+        .input = &term.input,
+        .sheet = &sht,
+    };
+    defer input_handler.deinit();
+
     const fps = 60;
     const npf: u64 = 1_000_000_000 / fps; // nanos per frame (more or less...)
 
@@ -45,60 +53,9 @@ pub fn main() !void {
 
         try renderer.render(&sht);
         try term.flush();
-
-        while (term.input.next() catch continue :outer) |key| {
-            if (sht.mode == .insert) {
-                if (key.codepoint == .escape) {
-                    sht.commit();
-                    sht.mode = .normal;
-                } else {
-                    try sht.onInput(key);
-                }
-            } else {
-                switch (key.codepoint) {
-                    .arrow_left, .h => sht.current -|= .{ 0, 1 },
-                    .arrow_down, .j => sht.current += .{ 1, 0 },
-                    .arrow_up, .k => sht.current -|= .{ 1, 0 },
-                    .arrow_right, .l => sht.current += .{ 0, 1 },
-                    .i => {
-                        sht.mode = .insert;
-                    },
-                    .x => {
-                        const str = try sht.yank(allocator);
-                        sht.clearSelection();
-                        sht.commit();
-
-                        if (clipboard) |*cb| {
-                            cb.deinit(allocator);
-                        }
-                        clipboard = str;
-                    },
-                    .y => {
-                        const str = try sht.yank(allocator);
-                        if (clipboard) |*cb| {
-                            cb.deinit(allocator);
-                        }
-                        clipboard = str;
-                    },
-                    .p => {
-                        if (clipboard) |cb| {
-                            var cell: *Cell = sht.currentCell();
-                            cell.input.clearAndFree(sht.allocator);
-                            try cell.input.appendSlice(sht.allocator, cb.bytes);
-                            sht.commit();
-                        }
-                    },
-                    .equal => {
-                        var cell: *Cell = sht.currentCell();
-                        cell.input.clearAndFree(sht.allocator);
-                        try cell.input.append(sht.allocator, '=');
-                        sht.mode = .insert;
-                    },
-                    .q => break :outer,
-                    else => {},
-                }
-                sht.current = @min(sht.current, common.upos{ sht.rows.len - 1, sht.cols.len - 1 });
-            }
-        }
+        input_handler.tick() catch |err| {
+            if (err == InputHandler.Error.Quit) break :outer;
+            return err;
+        };
     }
 }
