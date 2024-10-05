@@ -106,10 +106,8 @@ pub fn normalMode(self: *InputHandler, key: Key) !void {
             }
         },
         .equal => {
-            var cell = self.currentCell();
-            cell.input.clearAndFree(self.sheet.allocator);
-            try cell.input.append(self.sheet.allocator, '=');
-            self.mode = .insert;
+            try self.enterInsertMode();
+            try self.insertMode(key);
         },
         .q => return Error.Quit,
         else => {},
