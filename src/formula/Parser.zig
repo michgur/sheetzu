@@ -88,6 +88,7 @@ fn parseFunctionCall(self: *Parser) Error!AST {
     }
     self.tokenizer.consume();
 
+    _ = std.ascii.upperString(@constCast(fname.bytes), fname.bytes);
     const f = functions.get(fname.bytes) orelse return Error.ParsingError;
     var args = try self.parseArgumentList();
     errdefer args.deinit(self.allocator);
