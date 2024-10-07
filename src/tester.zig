@@ -4,7 +4,7 @@ const Sheet = @import("sheets/Sheet.zig");
 const Tokenizer = @import("formula/Tokenizer.zig");
 const Parser = @import("formula/Parser.zig");
 const String = @import("string/String.zig");
-const functions = @import("formula/functions.zig").functions;
+const functions = @import("formula/functions.zig");
 
 test "string" {
     // const allocator = std.heap.page_allocator;
@@ -29,11 +29,11 @@ test "AST functions" {
 
     const f = functions.get("AVG") orelse unreachable;
     var children = try allocator.alloc(AST, 3);
-    children[0] = AST{ .value = .{ .number = 68 } };
-    children[1] = AST{ .value = .{ .number = 69 } };
-    children[2] = AST{ .value = .{ .number = 70 } };
+    children[0] = AST{ .content = .{ .value = .{ .number = 68 } } };
+    children[1] = AST{ .content = .{ .value = .{ .number = 69 } } };
+    children[2] = AST{ .content = .{ .value = .{ .number = 70 } } };
     var ast = AST{
-        .op = .{ .FN = f },
+        .content = .{ .function = f },
         .children = children,
     };
     defer ast.deinit(allocator);
@@ -60,8 +60,8 @@ test "basic AST" {
     var sheet = Sheet.init(allocator, .{ 100, 100 }) catch @panic("Out of memory");
     defer sheet.deinit();
 
-    sheet.cell(.{ 1, 0 }).?.ast = AST{ .value = .{ .number = -2.76 } }; // A2
-    sheet.cell(.{ 3, 1 }).?.ast = AST{ .value = .{ .ref = .{ 1, 0 } } }; // B4
+    sheet.cell(.{ 1, 0 }).?.ast = AST{ .content = .{ .value = .{ .number = -2.76 } } }; // A2
+    sheet.cell(.{ 3, 1 }).?.ast = AST{ .content = .{ .value = .{ .ref = .{ 1, 0 } } } }; // B4
     sheet.tick(.{ 1, 0 });
     sheet.tick(.{ 3, 1 });
 
@@ -95,7 +95,7 @@ test "basic AST" {
 
 const indent = "-" ** 40;
 fn printAST(ast: *const AST, level: usize) void {
-    std.debug.print("{s} {any}\n", .{ indent[0 .. level * 2], ast.value });
+    std.debug.print("{s} {any}\n", .{ indent[0 .. level * 2], ast.content });
     for (ast.children) |*child| {
         printAST(child, level + 1);
     }

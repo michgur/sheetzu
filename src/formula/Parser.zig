@@ -21,7 +21,7 @@ const Tokenizer = @import("Tokenizer.zig");
 const AST = @import("AST.zig");
 const String = @import("../string/String.zig");
 const functions = @import("functions.zig").functions;
-const Function = @import("functions.zig").Function;
+const entities = @import("entities.zig");
 const Parser = @This();
 
 tokenizer: Tokenizer,
@@ -36,7 +36,7 @@ pub fn parse(allocator: std.mem.Allocator, input: []const u8) Error!AST {
     return if (is_formula) parser.parseFormula() else parser.parseRaw(input);
 }
 
-inline fn valueNode(value: AST.Value) AST {
+inline fn valueNode(value: entities.Value) AST {
     return AST{ .content = .{
         .value = value,
     } };
@@ -104,7 +104,7 @@ fn parseFunctionCall(self: *Parser) Error!AST {
     return args;
 }
 
-fn parseArgumentList(self: *Parser, function: Function) Error!AST {
+fn parseArgumentList(self: *Parser, function: entities.Function) Error!AST {
     var children = std.ArrayList(AST).init(self.allocator);
     errdefer children.deinit();
     try children.append(try self.parseExpression());

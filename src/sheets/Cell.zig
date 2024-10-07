@@ -6,11 +6,12 @@ const Style = @import("../render/Style.zig");
 const String = @import("../string/String.zig");
 const StringWriter = @import("../string/StringWriter.zig");
 const AST = @import("../formula/AST.zig");
+const Value = @import("../formula/entities.zig").Value;
 
 const Cell = @This();
 
 style: Style = .{},
-value: AST.Value = .{ .blank = {} },
+value: Value = .{ .blank = {} },
 str: String = .{},
 input: std.ArrayListUnmanaged(u8) = .{},
 dirty: bool = false,

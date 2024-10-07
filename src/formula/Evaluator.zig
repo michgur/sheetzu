@@ -3,8 +3,7 @@ const std = @import("std");
 const common = @import("../common.zig");
 const Sheet = @import("../sheets/Sheet.zig");
 const String = @import("../string/String.zig");
-const Function = @import("functions.zig").Function;
-const Operator = @import("functions.zig").Operator;
+const entities = @import("entities.zig");
 const AST = @import("AST.zig");
 const Evaluator = @This();
 
@@ -25,11 +24,11 @@ pub fn init() Evaluator {
 
 const NAN = std.math.nan(f64);
 
-fn deref(self: *const Evaluator, ref: common.upos) AST.Value {
-    return if (self.sheet.cell(ref)) |c| c.value else AST.Value{ .err = "!REF" };
+fn deref(self: *const Evaluator, ref: common.upos) entities.Value {
+    return if (self.sheet.cell(ref)) |c| c.value else entities.Value{ .err = "!REF" };
 }
 
-pub fn asNumber(self: *const Evaluator, value: AST.Value) f64 {
+pub fn asNumber(self: *const Evaluator, value: entities.Value) f64 {
     return switch (value) {
         .blank, .err => NAN,
         .number => |f| f,
@@ -39,7 +38,7 @@ pub fn asNumber(self: *const Evaluator, value: AST.Value) f64 {
 }
 
 /// memory is owned by evaluator - you probably want to use asOwnedString
-pub fn asString(self: *const Evaluator, value: AST.Value) String {
+pub fn asString(self: *const Evaluator, value: entities.Value) String {
     const bytes = switch (value) {
         .string => |s| return s,
         .number => |n| std.fmt.allocPrint(self.allocator, "{d}", .{n}) catch "!ERR",
@@ -50,11 +49,11 @@ pub fn asString(self: *const Evaluator, value: AST.Value) String {
     return String.init(self.allocator, bytes) catch @panic("Out of memory");
 }
 
-pub fn asOwnedString(self: *const Evaluator, allocator: std.mem.Allocator, value: AST.Value) !String {
+pub fn asOwnedString(self: *const Evaluator, allocator: std.mem.Allocator, value: entities.Value) !String {
     return try self.asString(value).clone(allocator);
 }
 
-fn applyOp(self: *const Evaluator, op: Operator, val_a: AST.Value, val_b: AST.Value) AST.Value {
+fn applyOp(self: *const Evaluator, op: entities.Operator, val_a: entities.Value, val_b: entities.Value) entities.Value {
     return switch (op) {
         .add => .{
             .number = self.asNumber(val_a) + self.asNumber(val_b),
@@ -79,14 +78,14 @@ fn applyOp(self: *const Evaluator, op: Operator, val_a: AST.Value, val_b: AST.Va
     };
 }
 
-fn evalInternal(self: *Evaluator, ast: *const AST) AST.Value {
+fn evalInternal(self: *Evaluator, ast: *const AST) entities.Value {
     if (ast.content == .operator) {
         const val_a = self.evalInternal(&ast.children[0]);
         const val_b = self.evalInternal(&ast.children[1]);
         return self.applyOp(ast.content.operator, val_a, val_b);
     }
     if (ast.content == .function) {
-        var args = self.allocator.alloc(AST.Value, ast.children.len) catch @panic("WHAT");
+        var args = self.allocator.alloc(entities.Value, ast.children.len) catch @panic("WHAT");
         for (ast.children, 0..) |ch, i| {
             args[i] = self.evalInternal(&ch);
         }
@@ -108,7 +107,7 @@ pub fn eval(
     self: *Evaluator,
     allocator: std.mem.Allocator,
     ast: *const AST,
-) !AST.Value {
+) !entities.Value {
     defer _ = self.arena.reset(.retain_capacity);
 
     self.allocator = self.arena.allocator();
