@@ -21,6 +21,7 @@ const Tokenizer = @import("Tokenizer.zig");
 const AST = @import("AST.zig");
 const String = @import("../string/String.zig");
 const functions = @import("functions.zig").functions;
+const Function = @import("functions.zig").Function;
 const Parser = @This();
 
 tokenizer: Tokenizer,
@@ -35,18 +36,20 @@ pub fn parse(allocator: std.mem.Allocator, input: []const u8) Error!AST {
     return if (is_formula) parser.parseFormula() else parser.parseRaw(input);
 }
 
+inline fn valueNode(value: AST.Value) AST {
+    return AST{ .content = .{
+        .value = value,
+    } };
+}
+
 // currently can only be a string or a number
 fn parseRaw(self: *Parser, bytes: []const u8) Error!AST {
-    const token = self.tokenizer.head catch return AST{ .value = .{
-        .string = try String.init(self.allocator, bytes),
-    } };
+    const token = self.tokenizer.head catch return valueNode(.{ .string = try String.init(self.allocator, bytes) });
     return switch (token.type) {
-        .number => AST{ .value = .{
+        .number => valueNode(.{
             .number = std.fmt.parseFloat(f64, token.bytes) catch return Error.ParsingError,
-        } },
-        else => AST{ .value = .{
-            .string = try String.init(self.allocator, bytes),
-        } },
+        }),
+        else => valueNode(.{ .string = try String.init(self.allocator, bytes) }),
     };
 }
 
@@ -88,15 +91,12 @@ fn parseFunctionCall(self: *Parser) Error!AST {
     }
     self.tokenizer.consume();
 
-    _ = std.ascii.upperString(@constCast(fname.bytes), fname.bytes);
     const f = functions.get(fname.bytes) orelse return Error.ParsingError;
-    var args = try self.parseArgumentList();
+    var args = try self.parseArgumentList(f);
     errdefer args.deinit(self.allocator);
-    args.op = .{ .FN = f };
 
     const close_paren = try self.tokenizer.head;
     if (close_paren.type != .close_paren) {
-        std.debug.print("token is {any}\n", .{self.tokenizer.head});
         return Error.ParsingError;
     }
     self.tokenizer.consume();
@@ -104,7 +104,7 @@ fn parseFunctionCall(self: *Parser) Error!AST {
     return args;
 }
 
-fn parseArgumentList(self: *Parser) Error!AST {
+fn parseArgumentList(self: *Parser, function: Function) Error!AST {
     var children = std.ArrayList(AST).init(self.allocator);
     errdefer children.deinit();
     try children.append(try self.parseExpression());
@@ -120,7 +120,7 @@ fn parseArgumentList(self: *Parser) Error!AST {
         try children.append(try self.parseExpression());
     }
 
-    return AST{ .children = try children.toOwnedSlice() };
+    return AST{ .children = try children.toOwnedSlice(), .content = .{ .function = function } };
 }
 
 fn parseExpression(self: *Parser) Error!AST {
@@ -139,12 +139,14 @@ fn parseExpression(self: *Parser) Error!AST {
                 children[0] = result;
                 children[1] = next_term;
                 result = AST{
-                    .op = .{ .OP = switch (t) {
-                        .plus => .add,
-                        .dash => .sub,
-                        .ampersand => .concat,
-                        else => unreachable,
-                    } },
+                    .content = .{
+                        .operator = switch (t) {
+                            .plus => .add,
+                            .dash => .sub,
+                            .ampersand => .concat,
+                            else => unreachable,
+                        },
+                    },
                     .children = children,
                 };
             },
@@ -169,7 +171,7 @@ fn parseTerm(self: *Parser) Error!AST {
                 children[0] = result;
                 children[1] = next_factor;
                 result = AST{
-                    .op = .{ .OP = if (t == .asterisk) .mul else .div },
+                    .content = .{ .operator = if (t == .asterisk) .mul else .div },
                     .children = children,
                 };
             },
@@ -185,10 +187,13 @@ fn parseFactor(self: *Parser) Error!AST {
         var result = try self.parsePrimary();
         errdefer result.deinit(self.allocator);
 
-        if (result.value == .number) {
-            result.value.number *= -1;
-            return result;
-        } else return Error.ParsingError;
+        const children = try self.allocator.alloc(AST, 2);
+        children[0] = valueNode(.{ .number = 0 });
+        children[1] = result;
+        return AST{
+            .content = .{ .operator = .sub },
+            .children = children,
+        };
     } else {
         return self.parsePrimary();
     }
@@ -197,11 +202,9 @@ fn parseFactor(self: *Parser) Error!AST {
 fn parseString(self: *Parser) Error!AST {
     const token = try self.tokenizer.head;
     defer self.tokenizer.consume();
-    return AST{
-        .value = .{
-            .string = try String.init(self.allocator, token.bytes[1 .. token.bytes.len - 1]),
-        },
-    };
+    return valueNode(.{
+        .string = try String.init(self.allocator, token.bytes[1 .. token.bytes.len - 1]),
+    });
 }
 
 // positive number, optionally with a decimal point
@@ -210,9 +213,7 @@ fn parseNumber(self: *Parser) Error!AST {
     defer self.tokenizer.consume();
 
     const value = std.fmt.parseFloat(f64, token.bytes) catch unreachable;
-    return AST{
-        .value = .{ .number = value },
-    };
+    return valueNode(.{ .number = value });
 }
 
 fn parseRef(self: *Parser) Error!AST {
@@ -224,7 +225,5 @@ fn parseRef(self: *Parser) Error!AST {
     } else unreachable;
     const col_idx = common.frombb26(token.bytes[0..col_len]);
     const row_idx = std.fmt.parseInt(usize, token.bytes[col_len..], 10) catch return Error.ParsingError;
-    return AST{
-        .value = .{ .ref = .{ row_idx - 1, col_idx } },
-    };
+    return valueNode(.{ .ref = .{ row_idx - 1, col_idx } });
 }

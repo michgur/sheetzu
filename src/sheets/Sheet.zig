@@ -7,10 +7,12 @@ const AST = @import("../formula/AST.zig");
 const Parser = @import("../formula/Parser.zig");
 const String = @import("../string/String.zig");
 const StringWriter = @import("../string/StringWriter.zig");
+const Evaluator = @import("../formula/Evaluator.zig");
 
 const Sheet = @This();
 
 allocator: std.mem.Allocator,
+evaluator: Evaluator,
 cells: [*][*]*Cell,
 size: common.upos,
 
@@ -46,6 +48,7 @@ pub fn init(allocator: std.mem.Allocator, initial_size: common.upos) !Sheet {
     @memset(cols, 9);
     return Sheet{
         .allocator = allocator,
+        .evaluator = Evaluator.init(),
         .cells = cells_slc.ptr,
         .size = initial_size,
         .rows = rows,
@@ -64,6 +67,7 @@ pub fn deinit(self: *Sheet) void {
     self.allocator.free(self.cells[0..self.size[0]]);
     self.allocator.free(self.rows);
     self.allocator.free(self.cols);
+    self.evaluator.deinit();
     self.* = undefined;
 }
 
@@ -76,7 +80,7 @@ fn errorAST(allocator: std.mem.Allocator) AST {
     const msg_stack = "!ERR";
     const msg = allocator.alloc(u8, msg_stack.len) catch @panic("Out of memory");
     @memcpy(msg, msg_stack);
-    return AST{ .value = .{ .err = msg } };
+    return AST{ .content = .{ .value = .{ .err = msg } } };
 }
 
 pub fn clearAndCommit(self: *Sheet, pos: common.upos) ?void {
@@ -110,8 +114,9 @@ pub fn tick(self: *Sheet, pos: common.upos) void {
     cl.value.deinit(self.allocator);
     cl.str.deinit(self.allocator);
 
-    cl.value = cl.ast.eval(self);
-    cl.str = cl.value.tostring(self.allocator) catch @panic("Why??");
+    self.evaluator.sheet = self;
+    cl.value = self.evaluator.eval(self.allocator, &cl.ast) catch @panic("fuck");
+    cl.str = self.evaluator.asOwnedString(self.allocator, cl.value) catch @panic("fuck2");
 
     for (cl.referrers.items) |refer| {
         self.tick(refer);
@@ -132,8 +137,8 @@ pub fn dependsOn(self: *const Sheet, this: common.upos, upon: common.upos) bool 
 /// whether placing `ast` on `pos` will cause a circluar dependency
 /// i.e. the AST references a cell that depends on `pos`
 fn isCircularRef(self: *const Sheet, pos: common.upos, ast: *const AST) bool {
-    if (ast.value == .ref) {
-        return self.dependsOn(ast.value.ref, pos);
+    if (ast.content == .value and ast.content.value == .ref) {
+        return self.dependsOn(ast.content.value.ref, pos);
     }
     for (ast.children) |child| {
         if (self.isCircularRef(pos, &child)) return true;
@@ -142,8 +147,8 @@ fn isCircularRef(self: *const Sheet, pos: common.upos, ast: *const AST) bool {
 }
 
 fn placeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
-    if (ast.value == .ref) {
-        if (self.cell(ast.value.ref)) |c| {
+    if (ast.content == .value and ast.content.value == .ref) {
+        if (self.cell(ast.content.value.ref)) |c| {
             c.referrers.append(self.allocator, pos) catch @panic("Out of memory");
         }
     }
@@ -154,8 +159,8 @@ fn placeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
 
 /// remove `pos` as a refer from all cells references by `ast`
 fn removeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
-    if (ast.value == .ref) {
-        if (self.cell(ast.value.ref)) |c| {
+    if (ast.content == .value and ast.content.value == .ref) {
+        if (self.cell(ast.content.value.ref)) |c| {
             _ = c.removeReferrer(pos);
         }
     }
