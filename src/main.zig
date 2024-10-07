@@ -53,6 +53,7 @@ pub fn main() !void {
 
         try renderer.render(&sht, &input_handler);
         try term.flush();
+
         input_handler.tick() catch |err| {
             if (err == InputHandler.Error.Quit) break;
             return err;

@@ -7,6 +7,7 @@ pub const Entity = union(enum) {
     value: Value,
     operator: Operator,
     function: Function,
+    // todo: move ref from Value to this
 };
 
 pub const Value = union(enum) {

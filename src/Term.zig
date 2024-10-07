@@ -78,26 +78,26 @@ fn uncook(self: *Term) !void {
 /// memory is owned by the caller.
 /// must be deinitialized separately, before calling this term's deinit().
 /// if a screen has already been created, returns that screen
-pub fn screen(self: *const Term, allocator: std.mem.Allocator) *Screen {
+pub fn screen(self: *Term, allocator: std.mem.Allocator) *Screen {
     if (self.render_screen == null) {
-        @constCast(self).render_screen = Screen.init(
+        self.render_screen = Screen.init(
             self.tty.writer(),
             allocator,
             self.getSize() catch @panic("failed to get size"),
         ) catch @panic("Out of memory");
     }
-    return @constCast(&self.render_screen.?);
+    return &self.render_screen.?;
 }
 
 var winch: bool = false;
 
-pub fn flush(self: *const Term) !void {
-    var scr = self.render_screen orelse return;
-
-    try scr.flush();
-    if (winch) {
-        try scr.resize(try self.getSize());
-        winch = false;
+pub fn flush(self: *Term) !void {
+    if (self.render_screen) |*scr| {
+        try scr.flush();
+        if (winch) {
+            try scr.resize(try self.getSize());
+            winch = false;
+        }
     }
 }
 

@@ -52,7 +52,7 @@ pub fn frombb26(b: []const u8) usize {
 
 const expectEqualStrings = std.testing.expectEqualStrings;
 const expectEqual = std.testing.expectEqual;
-test "b26" {
+test bb26 {
     var buf: [8]u8 = undefined;
     try expectEqualStrings("A", bb26(0, &buf));
     try expectEqualStrings("Z", bb26(25, &buf));
