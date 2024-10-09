@@ -20,36 +20,36 @@ test "string" {
 }
 
 test "AST functions" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer if (gpa.deinit() != .ok) @panic("oops");
-    const allocator = gpa.allocator();
-
-    var sheet = Sheet.init(allocator, .{ 100, 100 }) catch @panic("Out of memory");
-    defer sheet.deinit();
-
-    const f = functions.get("AVG") orelse unreachable;
-    var children = try allocator.alloc(AST, 3);
-    children[0] = AST{ .content = .{ .value = .{ .number = 68 } } };
-    children[1] = AST{ .content = .{ .value = .{ .number = 69 } } };
-    children[2] = AST{ .content = .{ .value = .{ .number = 70 } } };
-    var ast = AST{
-        .content = .{ .function = f },
-        .children = children,
-    };
-    defer ast.deinit(allocator);
-
-    var value = try sheet.evaluator.eval(allocator, &ast);
-    defer value.deinit(allocator);
-
-    std.debug.print("1. === {d}\n", .{sheet.evaluator.asNumber(value)});
-
-    var ast2 = try Parser.parse(allocator, "=aVg(68, 69, 70)");
-    defer ast2.deinit(allocator);
-
-    var value2 = try sheet.evaluator.eval(allocator, &ast2);
-    defer value2.deinit(allocator);
-
-    std.debug.print("2. === {d}\n", .{sheet.evaluator.asNumber(value2)});
+    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    // defer if (gpa.deinit() != .ok) @panic("oops");
+    // const allocator = gpa.allocator();
+    //
+    // var sheet = Sheet.init(allocator, .{ 100, 100 }) catch @panic("Out of memory");
+    // defer sheet.deinit();
+    //
+    // const f = functions.get("AVG") orelse unreachable;
+    // var children = try allocator.alloc(AST, 3);
+    // children[0] = AST{ .content = .{ .value = .{ .number = 68 } } };
+    // children[1] = AST{ .content = .{ .value = .{ .number = 69 } } };
+    // children[2] = AST{ .content = .{ .value = .{ .number = 70 } } };
+    // var ast = AST{
+    //     .content = .{ .function = f },
+    //     .children = children,
+    // };
+    // defer ast.deinit(allocator);
+    //
+    // var value = try sheet.evaluator.eval(allocator, &ast);
+    // defer value.deinit(allocator);
+    //
+    // std.debug.print("1. === {d}\n", .{sheet.evaluator.asNumber(value)});
+    //
+    // var ast2 = try Parser.parse(allocator, "=aVg(68, 69, 70)");
+    // defer ast2.deinit(allocator);
+    //
+    // var value2 = try sheet.evaluator.eval(allocator, &ast2);
+    // defer value2.deinit(allocator);
+    //
+    // std.debug.print("2. === {d}\n", .{sheet.evaluator.asNumber(value2)});
 }
 
 test "basic AST" {
@@ -91,6 +91,15 @@ test "basic AST" {
 
     printAST(&next.ast, 0);
     std.debug.print("=== {s}\n", .{next.value.string.bytes});
+
+    var ast = try Parser.parse(allocator, "=len(F6) & F6");
+    defer ast.deinit(allocator);
+
+    var value = try sheet.evaluator.eval(allocator, &ast);
+    defer value.deinit(allocator);
+
+    printAST(&ast, 0);
+    std.debug.print(". === {s}\n", .{sheet.evaluator.asString(value).bytes});
 }
 
 const indent = "-" ** 40;

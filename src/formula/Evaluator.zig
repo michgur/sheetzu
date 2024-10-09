@@ -22,12 +22,21 @@ pub fn init() Evaluator {
     };
 }
 
-const NAN = std.math.nan(f64);
+pub fn deinit(self: *Evaluator) void {
+    self.arena.deinit();
+    self.* = undefined;
+}
+
+fn resetArena(self: *Evaluator) void {
+    _ = self.arena.reset(.retain_capacity);
+    self.allocator = self.arena.allocator();
+}
 
 fn deref(self: *const Evaluator, ref: common.upos) entities.Value {
     return if (self.sheet.cell(ref)) |c| c.value else entities.Value{ .err = "!REF" };
 }
 
+const NAN = std.math.nan(f64);
 pub fn asNumber(self: *const Evaluator, value: entities.Value) f64 {
     return switch (value) {
         .blank, .err => NAN,
@@ -49,7 +58,8 @@ pub fn asString(self: *const Evaluator, value: entities.Value) String {
     return String.init(self.allocator, bytes) catch @panic("Out of memory");
 }
 
-pub fn asOwnedString(self: *const Evaluator, allocator: std.mem.Allocator, value: entities.Value) !String {
+pub fn asOwnedString(self: *Evaluator, allocator: std.mem.Allocator, value: entities.Value) !String {
+    defer self.resetArena(); // we may safely reset arena, as the string is being allocated on a different allocator
     return try self.asString(value).clone(allocator);
 }
 
@@ -86,14 +96,9 @@ fn evalInternal(self: *Evaluator, ast: *const AST) entities.Value {
     }
     if (ast.content == .function) {
         var args = self.allocator.alloc(entities.Value, ast.children.len) catch @panic("WHAT");
+        defer self.allocator.free(args);
         for (ast.children, 0..) |ch, i| {
             args[i] = self.evalInternal(&ch);
-        }
-        defer {
-            for (args) |*arg| {
-                arg.deinit(self.allocator);
-            }
-            self.allocator.free(args);
         }
         return ast.content.function(self, args);
     }
@@ -108,14 +113,7 @@ pub fn eval(
     allocator: std.mem.Allocator,
     ast: *const AST,
 ) !entities.Value {
-    defer _ = self.arena.reset(.retain_capacity);
-
-    self.allocator = self.arena.allocator();
+    defer self.resetArena();
     const result = self.evalInternal(ast);
     return result.clone(allocator);
-}
-
-pub fn deinit(self: *Evaluator) void {
-    self.arena.deinit();
-    self.* = undefined;
 }

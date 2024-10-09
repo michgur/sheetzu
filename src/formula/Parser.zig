@@ -44,13 +44,10 @@ inline fn valueNode(value: entities.Value) AST {
 
 // currently can only be a string or a number
 fn parseRaw(self: *Parser, bytes: []const u8) Error!AST {
-    const token = self.tokenizer.head catch return valueNode(.{ .string = try String.init(self.allocator, bytes) });
-    return switch (token.type) {
-        .number => valueNode(.{
-            .number = std.fmt.parseFloat(f64, token.bytes) catch return Error.ParsingError,
-        }),
-        else => valueNode(.{ .string = try String.init(self.allocator, bytes) }),
+    const number = std.fmt.parseFloat(f64, bytes) catch {
+        return valueNode(.{ .string = try String.init(self.allocator, bytes) });
     };
+    return valueNode(.{ .number = number });
 }
 
 fn parseFormula(self: *Parser) Error!AST {
