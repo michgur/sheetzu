@@ -53,15 +53,20 @@ fn parseSingleKey(self: *const Input) ParseError!Key {
 
     const cp_len = std.unicode.utf8ByteSequenceLength(bytes[0]) catch return ParseError.SeqParseError;
     const cp_int = std.unicode.utf8Decode(bytes[0..cp_len]) catch return ParseError.SeqParseError;
-    const cp: Key.Codepoint = @enumFromInt(cp_int);
+    const cp: Key.Code = @enumFromInt(cp_int);
 
     if (cp == .escape and bytes.len > cp_len) return self.parseEscSeq(bytes);
-    return Key{ .codepoint = cp, .bytes = bytes[0..cp_len] };
+    return Key{ .code = cp, .bytes = bytes[0..cp_len] };
 }
 
 fn parseEscSeq(self: *const Input, bytes: []const u8) ParseError!Key {
     std.debug.assert(cpEq(bytes[0], .escape) and bytes.len > 1);
-    if (cpEq(bytes[1], .open_square_bracket)) return self.parseCSISeq(bytes);
+    const cp: Key.Code = @enumFromInt(bytes[1]);
+    if (cp == .open_square_bracket) return self.parseCSISeq(bytes);
+    if (bytes[1] >= @intFromEnum(Key.Code.a) and bytes[1] <= @intFromEnum(Key.Code.z)) return Key{
+        .bytes = bytes[0..2],
+        .code = Key.Code.alt(cp),
+    };
     return ParseError.SeqParseError;
 }
 
@@ -69,11 +74,11 @@ fn parseCSISeq(_: *const Input, bytes: []const u8) ParseError!Key {
     std.debug.assert(cpEq(bytes[0], .csi) or (cpEq(bytes[0], .escape) and cpEq(bytes[1], .open_square_bracket)));
     // assume for now only the second option
     return Key{
-        .codepoint = Key.fromCSI(bytes[2]),
+        .code = Key.fromCSI(bytes[2]),
         .bytes = bytes[0..3],
     };
 }
 
-inline fn cpEq(byte: u8, cp: Key.Codepoint) bool {
+inline fn cpEq(byte: u8, cp: Key.Code) bool {
     return byte == @intFromEnum(cp);
 }

@@ -29,7 +29,7 @@ pub const Error = error{Quit};
 pub fn tick(self: *InputHandler) !void {
     while (self.input.next() catch return) |key| {
         if (self.mode == .insert) {
-            if (key.codepoint == .escape) {
+            if (key.code == .escape or key.code == .enter) {
                 try self.leaveInsertMode();
             } else {
                 try self.insertMode(key);
@@ -41,12 +41,12 @@ pub fn tick(self: *InputHandler) !void {
 pub fn insertMode(self: *InputHandler, key: Key) !void {
     std.debug.assert(self.formula != null);
     var formula = &(self.formula orelse unreachable);
-    switch (key.codepoint) {
+    switch (key.code) {
         .backspace => formula.backspace(),
-        .arrow_up => formula.moveRef(self, .{ -1, 0 }),
-        .arrow_down => formula.moveRef(self, .{ 1, 0 }),
-        .arrow_left => formula.moveRef(self, .{ 0, -1 }),
-        .arrow_right => formula.moveRef(self, .{ 0, 1 }),
+        .arrow_left, .alt_h => formula.moveRef(self, .{ 0, -1 }),
+        .arrow_down, .alt_j => formula.moveRef(self, .{ 1, 0 }),
+        .arrow_up, .alt_k => formula.moveRef(self, .{ -1, 0 }),
+        .arrow_right, .alt_l => formula.moveRef(self, .{ 0, 1 }),
         else => try formula.append(key.bytes),
     }
 }
@@ -75,7 +75,7 @@ fn leaveInsertMode(self: *InputHandler) !void {
 }
 
 pub fn normalMode(self: *InputHandler, key: Key) !void {
-    switch (key.codepoint) {
+    switch (key.code) {
         .arrow_left, .h => self.current -|= .{ 0, 1 },
         .arrow_down, .j => self.current += .{ 1, 0 },
         .arrow_up, .k => self.current -|= .{ 1, 0 },
