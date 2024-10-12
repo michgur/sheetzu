@@ -12,7 +12,8 @@
 //                  | "(" <Expression> ")"                  //
 //                  | <FunctionCall>                        //
 // <FunctionCall> ::= <identifier> "(" <ArgumentList> ")"   //
-// <ArgumentList> ::= <Expression> ("," <Expression>)*      //
+// <ArgumentList> ::= <Argument> ("," <Argument>)*          //
+// <Argument>     ::= <Expression> | <ref>:<ref>            //
 //////////////////////////////////////////////////////////////
 
 const std = @import("std");
@@ -104,7 +105,7 @@ fn parseFunctionCall(self: *Parser) Error!AST {
 fn parseArgumentList(self: *Parser, function: entities.Function) Error!AST {
     var children = std.ArrayList(AST).init(self.allocator);
     errdefer children.deinit();
-    try children.append(try self.parseExpression());
+    try children.append(try self.parseArgument());
 
     while (true) {
         const token = try self.tokenizer.head;
@@ -114,10 +115,27 @@ fn parseArgumentList(self: *Parser, function: entities.Function) Error!AST {
             else => return Error.ParsingError,
         }
 
-        try children.append(try self.parseExpression());
+        try children.append(try self.parseArgument());
     }
 
     return AST{ .children = try children.toOwnedSlice(), .content = .{ .function = function } };
+}
+
+fn parseArgument(self: *Parser) Error!AST {
+    // expression cannot start with a ref, unless it's a single ref
+    // so this is a range
+    const token = try self.tokenizer.head;
+    if (token.type != .ref) return self.parseExpression();
+    // parse range
+    const start = try self.parseRef();
+    const colon = try self.tokenizer.head;
+    if (colon.type != .colon) return start;
+    self.tokenizer.consume();
+    const end = try self.parseRef();
+    return valueNode(.{ .range = .{
+        .start = start.content.value.ref,
+        .end = end.content.value.ref,
+    } });
 }
 
 fn parseExpression(self: *Parser) Error!AST {

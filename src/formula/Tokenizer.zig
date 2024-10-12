@@ -40,6 +40,7 @@ fn readToken(self: *Tokenizer) Error!Token {
         '(' => return Token{ .bytes = self.input[0..1], .type = .open_paren },
         ')' => return Token{ .bytes = self.input[0..1], .type = .close_paren },
         ',' => return Token{ .bytes = self.input[0..1], .type = .comma },
+        ':' => return Token{ .bytes = self.input[0..1], .type = .colon },
         '&' => return Token{ .bytes = self.input[0..1], .type = .ampersand },
         '0'...'9' => return self.readNumber(),
         'A'...'Z' => return self.readRef() catch self.readIdentifier(), // try ref, fallback to identifier
@@ -125,6 +126,7 @@ pub const Token = struct {
         open_paren,
         close_paren,
         comma,
+        colon,
         plus,
         dash,
         asterisk,

@@ -14,18 +14,33 @@ fn err(eval: *const Evaluator, msg: []const u8) entities.Value {
 fn sum(eval: *const Evaluator, args: []const entities.Value) entities.Value {
     var s: f64 = 0;
     for (args) |arg| {
-        s += eval.asNumber(arg);
+        if (arg == .range) {
+            var iter = eval.rangeIterator(arg.range);
+            while (iter.next()) |val| {
+                s += eval.asNumber(val);
+            }
+        } else s += eval.asNumber(arg);
         if (std.math.isNan(s)) return .{ .number = NAN };
     }
     return .{ .number = s };
 }
 fn avg(eval: *const Evaluator, args: []const entities.Value) entities.Value {
     var s: f64 = 0;
+    var l: f64 = 0;
     for (args) |arg| {
-        s += eval.asNumber(arg);
+        if (arg == .range) {
+            var iter = eval.rangeIterator(arg.range);
+            while (iter.next()) |val| {
+                s += eval.asNumber(val);
+                l += 1;
+            }
+        } else {
+            s += eval.asNumber(arg);
+            l += 1;
+        }
         if (std.math.isNan(s)) return .{ .number = NAN };
     }
-    return .{ .number = s / @as(f64, @floatFromInt(args.len)) };
+    return .{ .number = s / l };
 }
 fn len(eval: *const Evaluator, args: []const entities.Value) entities.Value {
     if (args.len > 1) return err(eval, "Expected only 1 argument");

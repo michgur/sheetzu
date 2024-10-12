@@ -100,6 +100,15 @@ test "basic AST" {
 
     printAST(&ast, 0);
     std.debug.print(". === {s}\n", .{sheet.evaluator.asString(value).bytes});
+
+    const count = 5;
+    for (0..count) |i| {
+        sheet.cell(.{ i, 13 }).?.value = .{ .number = @floatFromInt(i + 1) };
+    }
+    sheet.cell(.{ count, 13 }).?.ast = try Parser.parse(allocator, "=SUM(N1:N5)");
+    sheet.tick(.{ count, 13 });
+    printAST(&sheet.cell(.{ count, 13 }).?.ast, 0);
+    std.debug.print("range test === {d}\n", .{sheet.evaluator.asNumber(sheet.cell(.{ count, 13 }).?.value)});
 }
 
 const indent = "-" ** 40;

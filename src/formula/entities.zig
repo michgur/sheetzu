@@ -3,6 +3,15 @@ const common = @import("../common.zig");
 const String = @import("../string/String.zig");
 const Evaluator = @import("Evaluator.zig");
 
+pub const Range = struct {
+    start: common.upos,
+    end: common.upos,
+
+    pub fn size(self: *const Range) usize {
+        return @reduce(.Mul, self.end -| self.start);
+    }
+};
+
 pub const Entity = union(enum) {
     value: Value,
     operator: Operator,
@@ -15,6 +24,7 @@ pub const Value = union(enum) {
     number: f64,
     string: String,
     ref: common.upos,
+    range: Range,
     err: []const u8,
 
     pub fn deinit(self: *Value, allocator: std.mem.Allocator) void {

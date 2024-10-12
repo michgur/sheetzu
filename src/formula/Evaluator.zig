@@ -43,6 +43,7 @@ pub fn asNumber(self: *const Evaluator, value: entities.Value) f64 {
         .number => |f| f,
         .string => |s| std.fmt.parseFloat(f64, s.bytes) catch NAN,
         .ref => |ref| self.asNumber(self.deref(ref)),
+        .range => NAN,
     };
 }
 
@@ -54,6 +55,7 @@ pub fn asString(self: *const Evaluator, value: entities.Value) String {
         .blank => "",
         .err => |e| e,
         .ref => "!REF",
+        .range => "!RNG",
     };
     return String.init(self.allocator, bytes) catch @panic("Out of memory");
 }
@@ -117,3 +119,31 @@ pub fn eval(
     const result = self.evalInternal(ast);
     return result.clone(allocator);
 }
+
+pub fn rangeIterator(self: *const Evaluator, range: entities.Range) RangeIterator {
+    const end = @min(self.sheet.size -| common.upos{ 1, 1 }, range.end);
+    return RangeIterator{ .sheet = self.sheet, .start = range.start, .curr = range.start, .end = end };
+}
+
+const RangeIterator = struct {
+    sheet: *const Sheet,
+    start: common.upos,
+    end: common.upos,
+    curr: ?common.upos,
+
+    pub fn next(self: *RangeIterator) ?entities.Value {
+        defer b: {
+            const curr = self.curr orelse break :b;
+            if (curr[1] + 1 <= self.end[1]) {
+                self.curr.?[1] += 1;
+            } else if (curr[0] + 1 <= self.end[0]) {
+                self.curr.?[0] += 1;
+                self.curr.?[1] = self.start[1];
+            } else {
+                self.curr = null;
+            }
+        }
+
+        return if (self.curr) |p| if (self.sheet.cell(p)) |c| c.value else null else null;
+    }
+};
