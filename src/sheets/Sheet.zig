@@ -147,9 +147,20 @@ fn isCircularRef(self: *const Sheet, pos: common.upos, ast: *const AST) bool {
 }
 
 fn placeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
-    if (ast.content == .value and ast.content.value == .ref) {
-        if (self.cell(ast.content.value.ref)) |c| {
-            c.referrers.append(self.allocator, pos) catch @panic("Out of memory");
+    if (ast.content == .value) {
+        switch (ast.content.value) {
+            .ref => |ref| if (self.cell(ref)) |c| {
+                c.referrers.append(self.allocator, pos) catch @panic("Out of memory");
+            },
+            .range => |range| {
+                var iter = self.evaluator.rangeIterator(range);
+                while (iter.nextRef()) |ref| {
+                    if (self.cell(ref)) |c| {
+                        c.referrers.append(self.allocator, pos) catch @panic("Out of memory");
+                    }
+                }
+            },
+            else => {},
         }
     }
     for (ast.children) |*child| {
@@ -159,11 +170,23 @@ fn placeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
 
 /// remove `pos` as a refer from all cells references by `ast`
 fn removeRefs(self: *const Sheet, pos: common.upos, ast: *const AST) void {
-    if (ast.content == .value and ast.content.value == .ref) {
-        if (self.cell(ast.content.value.ref)) |c| {
-            _ = c.removeReferrer(pos);
+    if (ast.content == .value) {
+        switch (ast.content.value) {
+            .ref => |ref| if (self.cell(ref)) |c| {
+                _ = c.removeReferrer(pos);
+            },
+            .range => |range| {
+                var iter = self.evaluator.rangeIterator(range);
+                while (iter.nextRef()) |ref| {
+                    if (self.cell(ref)) |c| {
+                        _ = c.removeReferrer(pos);
+                    }
+                }
+            },
+            else => {},
         }
     }
+
     for (ast.children) |*child| {
         self.removeRefs(pos, child);
     }

@@ -131,7 +131,11 @@ const RangeIterator = struct {
     end: common.upos,
     curr: ?common.upos,
 
-    pub fn next(self: *RangeIterator) ?entities.Value {
+    pub inline fn next(self: *RangeIterator) ?entities.Value {
+        return if (self.nextRef()) |ref| if (self.sheet.cell(ref)) |cell| cell.value else null else null;
+    }
+
+    pub fn nextRef(self: *RangeIterator) ?common.upos {
         defer b: {
             const curr = self.curr orelse break :b;
             if (curr[1] + 1 <= self.end[1]) {
@@ -144,6 +148,6 @@ const RangeIterator = struct {
             }
         }
 
-        return if (self.curr) |p| if (self.sheet.cell(p)) |c| c.value else null else null;
+        return self.curr;
     }
 };

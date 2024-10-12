@@ -5,6 +5,7 @@ const Key = @This();
 code: Code,
 bytes: []const u8,
 
+// don't read into it too much, just an enum of keys
 pub const Code = enum(u64) {
     const ALT = 1 << 63;
 
