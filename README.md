@@ -13,3 +13,5 @@ sheets tui 🐶
 - boolean values
 - "drag" logic
 - copy ASTs instead of values
+### Bugs
+- ranges - make bidirectional

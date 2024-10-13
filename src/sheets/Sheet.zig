@@ -137,8 +137,19 @@ pub fn dependsOn(self: *const Sheet, this: common.upos, upon: common.upos) bool 
 /// whether placing `ast` on `pos` will cause a circluar dependency
 /// i.e. the AST references a cell that depends on `pos`
 fn isCircularRef(self: *const Sheet, pos: common.upos, ast: *const AST) bool {
-    if (ast.content == .value and ast.content.value == .ref) {
-        return self.dependsOn(ast.content.value.ref, pos);
+    if (ast.content == .value) {
+        switch (ast.content.value) {
+            .ref => |ref| {
+                return self.dependsOn(ref, pos);
+            },
+            .range => |range| {
+                var iter = self.evaluator.rangeIterator(range);
+                return while (iter.nextRef()) |ref| {
+                    if (self.dependsOn(ref, pos)) break true;
+                } else false;
+            },
+            else => {},
+        }
     }
     for (ast.children) |child| {
         if (self.isCircularRef(pos, &child)) return true;
