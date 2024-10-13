@@ -132,9 +132,13 @@ fn parseArgument(self: *Parser) Error!AST {
     if (colon.type != .colon) return start;
     self.tokenizer.consume();
     const end = try self.parseRef();
-    return valueNode(.{ .range = .{
+    const range = entities.Range{
         .start = start.content.value.ref,
         .end = end.content.value.ref,
+    };
+    return valueNode(.{ .range = entities.Range{
+        .start = @min(range.start, range.end),
+        .end = @max(range.start, range.end),
     } });
 }
 
