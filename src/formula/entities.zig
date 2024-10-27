@@ -47,7 +47,40 @@ pub const Value = union(enum) {
             else => self.*,
         };
     }
+
+    pub fn format(
+        self: *const Value,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+        switch (self.*) {
+            .number => |number| try writer.print("{d}", .{number}),
+            .string => |string| try writer.print("{s}", .{string.bytes}),
+            .ref => |ref| {
+                var buf: [32]u8 = undefined;
+                const col = common.bb26(ref[1], &buf);
+                try writer.print("{s}{d}", .{ col, ref[0] + 1 });
+            },
+            .range => |range| {
+                var buf: [32]u8 = undefined;
+                var col = common.bb26(range.start[1], &buf);
+                try writer.print("{s}{d}:", .{ col, range.start[0] + 1 });
+                col = common.bb26(range.end[1], &buf);
+                try writer.print("{s}{d}", .{ col, range.end[0] + 1 });
+            },
+            else => {},
+        }
+    }
 };
 
-pub const Operator = enum { add, sub, mul, div, concat };
+pub const Operator = enum(u8) {
+    add = '+',
+    sub = '-',
+    mul = '*',
+    div = '/',
+    concat = '&',
+};
 pub const Function = *const fn (*const Evaluator, []const Value) Value;

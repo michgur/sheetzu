@@ -30,6 +30,7 @@ allocator: std.mem.Allocator,
 
 pub const Error = Tokenizer.Error || error{ParsingError} || std.mem.Allocator.Error;
 
+// AST is allocated using allocator. Guarantees no additional garbage
 pub fn parse(allocator: std.mem.Allocator, input: []const u8) Error!AST {
     const is_formula = input.len > 0 and input[0] == '=';
     const tokenizer = Tokenizer.init(if (is_formula) input[1..] else input);

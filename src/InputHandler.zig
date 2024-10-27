@@ -4,6 +4,7 @@ const Key = @import("input/Key.zig");
 const Sheet = @import("sheets/Sheet.zig");
 const Cell = @import("sheets/Cell.zig");
 const String = @import("string/String.zig");
+const AST = @import("formula/AST.zig");
 const common = @import("common.zig");
 const InputHandler = @This();
 
@@ -11,7 +12,7 @@ input: *Input,
 sheet: *Sheet,
 allocator: std.mem.Allocator,
 
-clipboard: ?String = null,
+clipboard: ?AST = null,
 current: common.upos = .{ 0, 0 },
 mode: enum {
     normal,
@@ -82,27 +83,28 @@ pub fn normalMode(self: *InputHandler, key: Key) !void {
         .arrow_right, .l => self.current += .{ 0, 1 },
         .i => try self.enterInsertMode(),
         .x => {
-            const str = try self.currentCell().str.clone(self.allocator);
+            const ast = try self.currentCell().ast.clone(self.allocator);
             self.sheet.clearAndCommit(self.current) orelse unreachable;
 
             if (self.clipboard) |*cb| {
                 cb.deinit(self.allocator);
             }
-            self.clipboard = str;
+            self.clipboard = ast;
         },
         .y => {
-            const str = try self.currentCell().str.clone(self.allocator);
+            const ast = try self.currentCell().ast.clone(self.allocator);
             if (self.clipboard) |*cb| {
                 cb.deinit(self.allocator);
             }
-            self.clipboard = str;
+            self.clipboard = ast;
         },
         .p => {
             if (self.clipboard) |cb| {
                 var cell = self.currentCell();
-                cell.input.clearAndFree(self.sheet.allocator);
-                try cell.input.appendSlice(self.sheet.allocator, cb.bytes);
-                self.sheet.commit(self.current) orelse unreachable;
+                // cell.input.clearAndFree(self.sheet.allocator);
+                // try cell.input.appendSlice(self.sheet.allocator, cb.bytes);
+                // self.sheet.commit(self.current) orelse unreachable;
+                cell.ast = try cb.clone(self.sheet.allocator);
             }
         },
         .equal => {

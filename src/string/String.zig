@@ -133,3 +133,15 @@ pub fn clone(self: *const String, allocator: std.mem.Allocator) Error!String {
         .codepoints = cps,
     };
 }
+
+// const CodepointIterator = struct {
+//     string: []const u8,
+//
+//     pub fn next(self: *CodepointIterator) ?Codepoint {
+//         if (self.string.len == 0) return null;
+//         const len = std.unicode.utf8ByteSequenceLength(self.string[0]) orelse 1;
+//         const bytes = std.unicode.utf8Decode(self.string[0..len]) orelse self.string[0];
+//     }
+// };
+
+// pub fn iterCodepoints(string: []const u8) CodepointIterator {}

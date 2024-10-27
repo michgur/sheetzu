@@ -7,6 +7,12 @@ const entities = @import("entities.zig");
 const AST = @import("AST.zig");
 const Evaluator = @This();
 
+// we evaluate using a mixture of
+// - constant values     (owned by AST)
+// - references          (owned by sheet)
+// - intermediate values (owned by evaluator)
+// which makes it difficult to know when we own a value and can free it.
+// therefore, we use a temporary arena and reset it on every evaluation.
 arena: std.heap.ArenaAllocator,
 /// allocator used for temporary allocations during evaluation
 allocator: std.mem.Allocator,
