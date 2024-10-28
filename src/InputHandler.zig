@@ -12,7 +12,10 @@ input: *Input,
 sheet: *Sheet,
 allocator: std.mem.Allocator,
 
-clipboard: ?AST = null,
+clipboard: ?struct {
+    ast: AST,
+    pos: common.upos,
+} = null,
 current: common.upos = .{ 0, 0 },
 mode: enum {
     normal,
@@ -21,7 +24,7 @@ mode: enum {
 formula: ?FormulaInput = null,
 
 pub fn deinit(self: *InputHandler) void {
-    if (self.clipboard) |*cb| cb.deinit(self.allocator);
+    if (self.clipboard) |*cb| cb.ast.deinit(self.allocator);
     self.* = undefined;
 }
 
@@ -87,24 +90,32 @@ pub fn normalMode(self: *InputHandler, key: Key) !void {
             self.sheet.clearAndCommit(self.current) orelse unreachable;
 
             if (self.clipboard) |*cb| {
-                cb.deinit(self.allocator);
+                cb.ast.deinit(self.allocator);
             }
-            self.clipboard = ast;
+            self.clipboard = .{
+                .ast = ast,
+                .pos = self.current,
+            };
         },
         .y => {
             const ast = try self.currentCell().ast.clone(self.allocator);
             if (self.clipboard) |*cb| {
-                cb.deinit(self.allocator);
+                cb.ast.deinit(self.allocator);
             }
-            self.clipboard = ast;
+            self.clipboard = .{ .ast = ast, .pos = self.current };
         },
         .p => {
             if (self.clipboard) |cb| {
+                var ast = try cb.ast.clone(self.allocator);
+                defer ast.deinit(self.allocator);
+                ast.move(self.current - cb.pos);
+                const str = try std.fmt.allocPrint(self.allocator, "={s}", .{ast});
+                defer self.allocator.free(str);
+
                 var cell = self.currentCell();
-                // cell.input.clearAndFree(self.sheet.allocator);
-                // try cell.input.appendSlice(self.sheet.allocator, cb.bytes);
-                // self.sheet.commit(self.current) orelse unreachable;
-                cell.ast = try cb.clone(self.sheet.allocator);
+                cell.input.clearAndFree(self.sheet.allocator);
+                try cell.input.appendSlice(self.sheet.allocator, str);
+                self.sheet.commit(self.current) orelse unreachable;
             }
         },
         .equal => {

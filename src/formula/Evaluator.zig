@@ -20,10 +20,10 @@ allocator: std.mem.Allocator,
 sheet: *const Sheet,
 
 pub fn init() Evaluator {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    const arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     return Evaluator{
         .arena = arena,
-        .allocator = arena.allocator(),
+        .allocator = undefined,
         .sheet = undefined,
     };
 }
@@ -67,7 +67,7 @@ pub fn asString(self: *const Evaluator, value: entities.Value) String {
 }
 
 pub fn asOwnedString(self: *Evaluator, allocator: std.mem.Allocator, value: entities.Value) !String {
-    defer self.resetArena(); // we may safely reset arena, as the string is being allocated on a different allocator
+    self.resetArena();
     return try self.asString(value).clone(allocator);
 }
 
@@ -103,7 +103,7 @@ fn evalInternal(self: *Evaluator, ast: *const AST) entities.Value {
         return self.applyOp(ast.content.operator, val_a, val_b);
     }
     if (ast.content == .function) {
-        var args = self.allocator.alloc(entities.Value, ast.children.len) catch @panic("WHAT");
+        var args = self.allocator.alloc(entities.Value, ast.children.len) catch @panic("OOPS");
         defer self.allocator.free(args);
         for (ast.children, 0..) |ch, i| {
             args[i] = self.evalInternal(&ch);
@@ -121,7 +121,7 @@ pub fn eval(
     allocator: std.mem.Allocator,
     ast: *const AST,
 ) !entities.Value {
-    defer self.resetArena();
+    self.resetArena();
     const result = self.evalInternal(ast);
     return result.clone(allocator);
 }

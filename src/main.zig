@@ -10,7 +10,6 @@ const InputHandler = @import("InputHandler.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
     defer switch (gpa.deinit()) {
         .leak => {
             std.debug.print("oops, leaky time!", .{});
@@ -21,14 +20,17 @@ pub fn main() !void {
     var term = try Term.init();
     defer term.deinit();
 
+    loop(&term, gpa.allocator()) catch {
+        std.debug.print("oopsie, I died\n", .{});
+    };
+}
+
+pub fn loop(term: *Term, allocator: std.mem.Allocator) !void {
     const screen = term.screen(allocator);
     defer screen.deinit();
 
     var sht = try Sheet.init(allocator, .{ 60, 100 });
     defer sht.deinit();
-
-    var clipboard: ?String = null;
-    defer if (clipboard) |*cb| cb.deinit(allocator);
 
     var renderer = SheetRenderer{ .screen = screen };
 

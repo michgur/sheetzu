@@ -38,20 +38,20 @@ pub fn clone(self: *const AST, allocator: std.mem.Allocator) !AST {
     };
 }
 
-pub fn move(self: *AST, offset: common.upos) void {
+pub fn move(self: *AST, offset: common.ipos) void {
     if (self.content == .value) {
         switch (self.content.value) {
-            .ref => |ref| self.content.value = ref + offset,
+            .ref => |ref| self.content.value = .{ .ref = ref + offset },
             .range => |range| {
-                self.content.value = entities.Range{
+                self.content.value = .{ .range = entities.Range{
                     .start = range.start + offset,
                     .end = range.end + offset,
-                };
+                } };
             },
             else => {},
         }
     }
-    for (self.children) |child| {
+    for (self.children) |*child| {
         child.move(offset);
     }
 }
@@ -71,7 +71,7 @@ pub fn format(
         .function => |fun| {
             const func = for (functions.keys(), functions.values()) |k, v| {
                 if (v == fun) break k;
-            } else "?FN?"; // TODO: a better lookup
+            } else "?FN?"; // TODO: a less embarrassing lookup
             try writer.print("{s}(", .{func});
             if (self.children.len > 0) {
                 for (self.children[0 .. self.children.len - 1]) |child| {
